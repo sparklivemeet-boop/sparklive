@@ -1,0 +1,11 @@
+export { authService, AuthService } from "./auth.service";
+export { matchService, MatchService } from "./match.service";
+export { chatService, ChatService } from "./chat.service";
+export { liveService, LiveService } from "./live.service";
+export { walletService, WalletService } from "./wallet.service";
+export { notificationService, NotificationService } from "./notification.service";
+export { paymentService, PaymentService } from "./payment.service";
+export { moderationService, ModerationService } from "./moderation.service";
+export { userService, UserService } from "./user.service";
+export { adminService, AdminService } from "./admin.service";
+export { giftService, GiftService } from "./gift.service";

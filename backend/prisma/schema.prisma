@@ -1,0 +1,591 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String?   @unique
+  phone        String?   @unique
+  phoneNumber  String?   @unique // For OTP authentication
+  passwordHash String?   // Optional for OAuth users
+  username     String    @unique
+  fullName     String?
+  bio          String?
+  gender       String?
+  interestedIn String?
+  age          Int?
+  country      String?
+  city         String?
+  avatar       String?
+  verified     Boolean   @default(false)
+  coins        Int       @default(0)
+  earnings     Float     @default(0.0)
+  premium      Boolean   @default(false)
+  role         String    @default("USER")
+  status       String    @default("ACTIVE")
+
+  // OAuth
+  googleId     String?   @unique
+  appleId      String?   @unique
+
+  profile           Profile?
+  photos            Photo[]
+  wallet            Wallet?
+  sentGifts         GiftTransaction[] @relation("SentGiftTransactions")
+  receivedGifts     GiftTransaction[] @relation("ReceivedGiftTransactions")
+  notifications     Notification[]
+  withdrawals       Withdrawal[]
+  walletTransactions WalletTransaction[]
+  reportsSubmitted  Report[]          @relation("ReportSubmitter")
+  reportsReceived   Report[]          @relation("ReportTarget")
+  subscriptions     Subscription[]
+
+  // New Social Systems
+  followers        Follow[]           @relation("Following")
+  following        Follow[]           @relation("Follower")
+  
+  // X-Style Posts
+  posts            Post[]             @relation("UserPosts")
+  postLikes        PostLike[]
+  postComments     PostComment[]
+
+  // TikTok-Style Videos
+  videos           Video[]            @relation("CreatorVideos")
+  videoLikes       VideoLike[]
+  videoComments    VideoComment[]
+  videoSaves       VideoSave[]
+  watchHistory     WatchHistory[]
+
+  // Real Messenger Conversations
+  participants     Participant[]
+  messagesSent     Message[]          @relation("MessageSender")
+  messageReads     MessageRead[]
+  messageReactions MessageReaction[]
+  userPresence     UserPresence?
+
+  // Twitch-Style Livestreams
+  liveStreams      LiveStream[]       @relation("HostLiveStreams")
+  streamViewers    StreamViewer[]
+  liveChatMessages LiveChatMessage[]
+  streamerFollowers StreamFollower[]  @relation("StreamerFollowers")
+  userStreamFollows StreamFollower[]  @relation("UserStreamFollows")
+
+  // Account Settings & Management
+  userSettings     UserSettings?
+  notificationPrefs NotificationPreferences?
+  securityLogs     SecurityLog[]
+  sessions         Session[]
+  blockedUsers     BlockedUser[]   @relation("BlockedBy")
+  blockedBy        BlockedUser[]   @relation("BlockedTarget")
+  mutedUsers       MutedUser[]     @relation("MutedBy")
+  mutedBy          MutedUser[]     @relation("MutedTarget")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Profile {
+  id            String         @id @default(cuid())
+  username      String         @unique
+  fullName      String?
+  bio           String?
+  avatarUrl     String?
+  bannerUrl     String?
+  website       String?
+  gender        String?
+  age           Int?
+  country       String?
+  city          String?
+  interests     String?
+  isOnline      Boolean        @default(false)
+  socialLinks   SocialLink[]
+  media         ProfileMedia[]
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+model SocialLink {
+  id        String   @id @default(cuid())
+  profileId String
+  platform  String
+  url       String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([profileId, platform])
+}
+
+model ProfileMedia {
+  id        String   @id @default(cuid())
+  profileId String
+  url       String
+  type      String   @default("IMAGE")
+  title     String?
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model Photo {
+  id     String @id @default(cuid())
+  userId String
+  url    String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+model Wallet {
+  id              String @id @default(cuid())
+  coinBalance     Int    @default(0)
+  earningsBalance Int    @default(0)
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  follower    User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+}
+
+// ==========================================
+// TIKTOK-STYLE VIDEOS
+// ==========================================
+
+model Video {
+  id           String         @id @default(cuid())
+  title        String
+  description  String?
+  videoUrl     String
+  thumbnailUrl String?
+  duration     Float?
+  views        Int            @default(0)
+  creatorId    String
+  creator      User           @relation("CreatorVideos", fields: [creatorId], references: [id], onDelete: Cascade)
+  
+  likes        VideoLike[]
+  comments     VideoComment[]
+  saves        VideoSave[]
+  watchHistory WatchHistory[]
+
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model VideoLike {
+  id        String   @id @default(cuid())
+  userId    String
+  videoId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, videoId])
+}
+
+model VideoComment {
+  id        String   @id @default(cuid())
+  userId    String
+  videoId   String
+  content   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model VideoSave {
+  id        String   @id @default(cuid())
+  userId    String
+  videoId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, videoId])
+}
+
+model WatchHistory {
+  id         String   @id @default(cuid())
+  userId     String
+  videoId    String
+  watchTime  Float    @default(0.0)
+  completed  Boolean  @default(false)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video      Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, videoId])
+}
+
+// ==========================================
+// TWITTER/X-STYLE POSTS
+// ==========================================
+
+model Post {
+  id        String   @id @default(cuid())
+  authorId  String
+  author    User     @relation("UserPosts", fields: [authorId], references: [id], onDelete: Cascade)
+  content   String
+  mediaUrl  String?
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  likes     PostLike[]
+  comments  PostComment[]
+}
+
+model PostLike {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+}
+
+model PostComment {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  content   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+// ==========================================
+// MESSENGER SYSTEM
+// ==========================================
+
+model Conversation {
+  id           String        @id @default(cuid())
+  isGroup      Boolean       @default(false)
+  name         String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  
+  participants Participant[]
+  messages     Message[]
+}
+
+model Participant {
+  id             String       @id @default(cuid())
+  userId         String
+  conversationId String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([userId, conversationId])
+}
+
+model Message {
+  id             String            @id @default(cuid())
+  conversationId String
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User              @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  content        String
+  type           String            @default("TEXT") // TEXT, IMAGE, VIDEO, FILE, VOICE
+  createdAt      DateTime          @default(now())
+
+  reads          MessageRead[]
+  reactions      MessageReaction[]
+  attachments    Attachment[]
+}
+
+model MessageRead {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt    DateTime @default(now())
+
+  @@unique([messageId, userId])
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  reaction  String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId])
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  url       String
+  fileType  String
+  fileName  String?
+  fileSize  Int?
+  createdAt DateTime @default(now())
+}
+
+model UserPresence {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isOnline   Boolean  @default(false)
+  lastActive DateTime @default(now())
+}
+
+// ==========================================
+// LIVESTREAM PLATFORM
+// ==========================================
+
+model LiveStream {
+  id           String            @id @default(cuid())
+  hostId       String
+  host         User              @relation("HostLiveStreams", fields: [hostId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  thumbnailUrl String?
+  streamKey    String?
+  playbackUrl  String?
+  viewerCount  Int               @default(0)
+  allowGifts   Boolean           @default(true)
+  allowPK      Boolean           @default(false)
+  active       Boolean           @default(true)
+  categoryName String?
+  category     StreamCategory?   @relation(fields: [categoryName], references: [name], onDelete: SetNull)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  viewers      StreamViewer[]
+  chatMessages LiveChatMessage[]
+}
+
+model StreamCategory {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  description String?
+  streams     LiveStream[]
+}
+
+model LiveChatMessage {
+  id        String     @id @default(cuid())
+  streamId  String
+  stream    LiveStream @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   String
+  createdAt DateTime   @default(now())
+}
+
+model StreamViewer {
+  id        String     @id @default(cuid())
+  streamId  String
+  stream    LiveStream @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt  DateTime   @default(now())
+
+  @@unique([streamId, userId])
+}
+
+model StreamFollower {
+  id         String   @id @default(cuid())
+  streamerId String
+  streamer   User     @relation("StreamerFollowers", fields: [streamerId], references: [id], onDelete: Cascade)
+  followerId String
+  follower   User     @relation("UserStreamFollows", fields: [followerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([streamerId, followerId])
+}
+
+// ==========================================
+// SETTINGS & LOGS
+// ==========================================
+
+model UserSettings {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme           String   @default("dark")
+  privacyProfile  String   @default("public") // public, private
+  privacyMessages String   @default("everyone") // everyone, following, noone
+  privacyFollows  String   @default("everyone") // everyone, followers, noone
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model NotificationPreferences {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailAlerts Boolean  @default(true)
+  pushAlerts  Boolean  @default(true)
+  chatAlerts  Boolean  @default(true)
+  liveAlerts  Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BlockedUser {
+  id        String   @id @default(cuid())
+  userId    String
+  targetId  String
+  user      User     @relation("BlockedBy", fields: [userId], references: [id], onDelete: Cascade)
+  target    User     @relation("BlockedTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, targetId])
+}
+
+model MutedUser {
+  id        String   @id @default(cuid())
+  userId    String
+  targetId  String
+  user      User     @relation("MutedBy", fields: [userId], references: [id], onDelete: Cascade)
+  target    User     @relation("MutedTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, targetId])
+}
+
+model SecurityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  userAgent String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
+
+// ==========================================
+// CORE GIFTS, PAYMENTS, NOTIFICATIONS
+// ==========================================
+
+model Gift {
+  id          String            @id @default(cuid())
+  name        String
+  price       Int
+  icon        String?
+  description String?
+  transactions GiftTransaction[]
+  createdAt   DateTime          @default(now())
+}
+
+model GiftTransaction {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  giftId     String
+  streamId   String?
+  amount     Int
+  sender     User     @relation("SentGiftTransactions", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("ReceivedGiftTransactions", fields: [receiverId], references: [id], onDelete: Cascade)
+  gift       Gift     @relation(fields: [giftId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model WalletTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  amount    Float
+  status    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model Withdrawal {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Float
+  method    String
+  address   String?
+  bankName  String?
+  accountNo String?
+  status    String   @default("PENDING")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model Report {
+  id         String   @id @default(cuid())
+  reporterId String
+  targetId   String
+  reason     String
+  submitter  User     @relation("ReportSubmitter", fields: [reporterId], references: [id], onDelete: Cascade)
+  target     User     @relation("ReportTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+}
+
+model Subscription {
+  id        String   @id @default(cuid())
+  userId    String
+  plan      String
+  active    Boolean
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+// ==========================================
+// AUTHENTICATION
+// ==========================================
+
+model PhoneOTP {
+  id        String   @id @default(cuid())
+  phoneNumber String
+  otp       String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([phoneNumber])
+  @@index([expiresAt])
+}

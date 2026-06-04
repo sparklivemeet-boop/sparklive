@@ -1,0 +1,85 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.production.local
+.env.development.local
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+.vercel/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.vim/
+.project
+.classpath
+*.sublime-project
+*.sublime-workspace
+
+# Testing
+coverage/
+.nyc_output/
+jest.config.js.map
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+prisma/migrations/
+
+# Uploads & temporary files
+backend/public/uploads/*
+!backend/public/uploads/.gitkeep
+public/uploads/*
+!public/uploads/.gitkeep
+tmp/
+temp/
+
+# Electron
+electron/dist/
+electron/build/
+
+# System
+.cache/
+.turbo/
+dist-ssr/
+
+# Optional npm cache directory
+.npm
+
+# Misc
+*.pem
+.cache
+.eslintcache

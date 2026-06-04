@@ -1,0 +1,11 @@
+{
+  "app": "sparklive-backend",
+  "buildCommand": "npm install && npm run build",
+  "startCommand": "npm start",
+  "framework": "nodejs",
+  "nodeVersion": "24.x",
+  "regions": ["us-east-1"],
+  "environment": {
+    "NODE_ENV": "production"
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "private": true,
+  "workspaces": ["frontend", "backend"],
+  "main": "electron/main.js",
+  "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:web": "npm --prefix frontend run dev",
+    "electron:dev": "cross-env ELECTRON_DEV=true wait-on http://localhost:3000/ && electron .",
+    "dev:desktop": "concurrently \"npm run dev:backend\" \"npm run dev:web\" \"npm run electron:dev\"",
+    "build:backend": "npm --prefix backend run build",
+    "build:web": "npm --prefix frontend run build",
+    "build:desktop": "npm run build:web && npm run build:backend && electron-builder --win",
+    "start:backend": "npm --prefix backend run start"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "cross-env": "^10.1.0",
+    "electron": "^26.5.0",
+    "electron-builder": "^24.6.0",
+    "electron-updater": "^6.8.3",
+    "wait-on": "^7.0.1"
+  },
+  "build": {
+    "appId": "com.sparklive.desktop",
+    "productName": "SparkLive",
+    "files": [
+      "electron/**/*",
+      "frontend/**/*",
+      "backend/package.json",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "buildResources": "assets",
+      "output": "dist_electron"
+    },
+    "win": {
+      "target": ["nsis"],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

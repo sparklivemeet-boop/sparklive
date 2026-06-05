@@ -528,16 +528,6 @@ export class AuthService {
   }
 }
 
-export const authService = new AuthService();
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [{ email }, { username }],
-      },
-    });
-
-    if (existingUser) {
-      throw new Error("Email or username already exists");
-    }
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);

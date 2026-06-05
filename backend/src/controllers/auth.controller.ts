@@ -387,20 +387,3 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
     res.status(400).json({ error: message });
   }
 };
-
-    if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
-    if (!newPassword) {
-      res.status(400).json({ error: 'New password is required' });
-      return;
-    }
-
-    await authService.resetPassword(userId, newPassword);
-    res.status(200).json({ message: 'Password reset successfully' });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Internal server error';
-    res.status(400).json({ error: message });
-  }
-};

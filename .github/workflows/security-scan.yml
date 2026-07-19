@@ -1,0 +1,101 @@
+name: Weekly Security Scan
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'  # Every Sunday at 2 AM
+  workflow_dispatch:
+
+jobs:
+  sast:
+    name: Static Application Security Testing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript, typescript
+          queries: security-and-quality
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
+
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Dependencies
+        run: |
+          cd backend && npm audit --audit-level=moderate
+          cd ../frontend && npm audit --audit-level=moderate
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v3
+
+  container-scan:
+    name: Container Vulnerability Scan
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [frontend, backend, websocket, worker, media, admin]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -f infrastructure/Dockerfile.${{ matrix.service }} -t sparklive-${{ matrix.service }}:latest .
+
+      - name: Run Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: sparklive-${{ matrix.service }}:latest
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          severity: CRITICAL,HIGH,MEDIUM
+          exit-code: 1
+
+      - name: Upload results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.service }}.sarif
+
+  dast:
+    name: Dynamic Application Security Testing
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: ZAP Scan
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: 'https://staging.sparklive.com'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+
+  report:
+    name: Generate Security Report
+    needs: [sast, dependency-scan, container-scan, dast]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Upload Security Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            **/trivy-*.sarif
+            **/results.sarif
+          retention-days: 30
+
+      - name: Notify Security Team
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: 'Weekly security scan completed. Check artifacts for details.'
+          fields: repo,workflow
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SECURITY_SLACK_WEBHOOK }}
+        if: always()

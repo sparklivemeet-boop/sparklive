@@ -1,0 +1,94 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: sparklive
+
+namePrefix: sparklive-
+nameSuffix: -prod
+
+commonLabels:
+  app: sparklive
+  environment: production
+  managed-by: kustomize
+
+commonAnnotations:
+  version: ${IMAGE_TAG}
+  deployed-at: ${DEPLOY_TIMESTAMP}
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secrets.yaml
+  - services.yaml
+  - ingress.yaml
+  - network-policies.yaml
+  - priority-classes.yaml
+  - resource-quotas.yaml
+  - limit-ranges.yaml
+  - postgres-statefulset.yaml
+  - redis-statefulset.yaml
+  - redis-configmap.yaml
+  - minio-statefulset.yaml
+  - frontend-deployment.yaml
+  - backend-deployment.yaml
+  - websocket-deployment.yaml
+  - worker-deployment.yaml
+  - media-deployment.yaml
+  - ai-deployment.yaml
+  - admin-deployment.yaml
+  - jobs.yaml
+  - cronjobs.yaml
+  - pv-claims.yaml
+  - hpas.yaml
+  - pod-disruption-budgets.yaml
+
+images:
+  - name: ${REGISTRY}/sparklive-frontend
+    newTag: ${IMAGE_TAG}
+  - name: ${REGISTRY}/sparklive-backend
+    newTag: ${IMAGE_TAG}
+  - name: ${REGISTRY}/sparklive-websocket
+    newTag: ${IMAGE_TAG}
+  - name: ${REGISTRY}/sparklive-worker
+    newTag: ${IMAGE_TAG}
+  - name: ${REGISTRY}/sparklive-media
+    newTag: ${IMAGE_TAG}
+  - name: ${REGISTRY}/sparklive-ai
+    newTag: ${IMAGE_TAG}
+  - name: ${REGISTRY}/sparklive-admin
+    newTag: ${IMAGE_TAG}
+
+configMapGenerator:
+  - name: sparklive-config
+    behavior: merge
+    literals:
+      - DEPLOY_VERSION=${IMAGE_TAG}
+
+secretGenerator:
+  - name: sparklive-secrets
+    behavior: merge
+    envs:
+      - .env.secrets
+
+patchesStrategicMerge:
+  - |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: frontend
+    spec:
+      replicas: ${FRONTEND_REPLICAS}
+  - |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: backend-api
+    spec:
+      replicas: ${BACKEND_REPLICAS}
+  - |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: websocket
+    spec:
+      replicas: ${WEBSOCKET_REPLICAS}

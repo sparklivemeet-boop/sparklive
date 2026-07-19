@@ -1,0 +1,101 @@
+name: SparkLive Staging Deployment
+
+on:
+  push:
+    branches: [develop]
+
+env:
+  REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
+  IMAGE_TAG: ${{ github.sha }}
+  KUBE_CONFIG: ${{ secrets.KUBE_CONFIG_STAGING }}
+  KUBE_NAMESPACE: sparklive-staging
+
+jobs:
+  ci-checks:
+    name: CI Checks
+    uses: ./.github/workflows/ci.yml
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: ci-checks
+    runs-on: ubuntu-latest
+    environment: staging
+    concurrency: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Configure Kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ env.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+
+      - name: Deploy to Kubernetes
+        env:
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          REGISTRY: ${{ env.REGISTRY }}
+          FRONTEND_REPLICAS: 2
+          BACKEND_REPLICAS: 3
+          WEBSOCKET_REPLICAS: 3
+        run: |
+          cd infrastructure/k8s
+          kustomize edit set image \
+            ${REGISTRY}/sparklive-frontend:${IMAGE_TAG} \
+            ${REGISTRY}/sparklive-backend:${IMAGE_TAG} \
+            ${REGISTRY}/sparklive-websocket:${IMAGE_TAG} \
+            ${REGISTRY}/sparklive-worker:${IMAGE_TAG} \
+            ${REGISTRY}/sparklive-media:${IMAGE_TAG} \
+            ${REGISTRY}/sparklive-admin:${IMAGE_TAG}
+          kustomize build . | kubectl apply -f - -n ${{ env.KUBE_NAMESPACE }} --validate=true
+
+      - name: Wait for Rollout
+        run: |
+          kubectl rollout status deployment/frontend -n ${{ env.KUBE_NAMESPACE }} --timeout=5m
+          kubectl rollout status deployment/backend-api -n ${{ env.KUBE_NAMESPACE }} --timeout=5m
+          kubectl rollout status deployment/websocket -n ${{ env.KUBE_NAMESPACE }} --timeout=5m
+
+  smoke-tests:
+    name: Smoke Tests
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health Check - API
+        run: |
+          curl -f --retry 5 --retry-delay 10 \
+            https://api.staging.sparklive.com/health \
+            || exit 1
+
+      - name: Health Check - Frontend
+        run: |
+          curl -f --retry 5 --retry-delay 10 \
+            https://staging.sparklive.com \
+            || exit 1
+
+      - name: Database Connectivity Test
+        run: |
+          kubectl exec -n ${{ env.KUBE_NAMESPACE }} \
+            deploy/backend-api -- \
+            curl -f http://localhost:5000/health \
+            || exit 1
+
+      - name: Redis Connectivity Test
+        run: |
+          kubectl run redis-test --image=redis:7-alpine \
+            -n ${{ env.KUBE_NAMESPACE }} --rm --restart=Never \
+            -- redis-cli -h redis ping || exit 1
+
+  notify:
+    name: Notify
+    needs: [smoke-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Slack Notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

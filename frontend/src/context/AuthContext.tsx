@@ -37,44 +37,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Restore session from storage
-  const restoreSession = useCallback(async () => {
-    try {
-      const storedToken = await storage.getItem(TOKEN_STORAGE_KEY);
-      const storedRefreshToken = await storage.getItem(REFRESH_TOKEN_STORAGE_KEY);
-      const storedUser = await storage.getItem(USER_STORAGE_KEY);
-
-      if (storedToken && storedUser) {
-        setToken(storedToken);
-        setRefreshToken(storedRefreshToken);
-        setUser(JSON.parse(storedUser));
-        
-        // Verify token is still valid by fetching user profile
-        try {
-          const response = await authGetMe(storedToken);
-          if (response.user) {
-            setUser(response.user);
-            await storage.setItem(USER_STORAGE_KEY, JSON.stringify(response.user));
-          }
-        } catch (error) {
-          console.warn('Token verification failed, attempting refresh...');
-          // Token might be expired, try refresh
-          if (storedRefreshToken) {
-            await refreshAccessToken(storedRefreshToken);
-          } else {
-            // Clear invalid session
-            await clearSession();
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Failed to restore auth session', error);
-      await clearSession();
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
   // Clear session
   const clearSession = useCallback(async () => {
     setToken(null);
@@ -112,6 +74,60 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsRefreshing(false);
     }
   }, [clearSession, isRefreshing]);
+
+  // Restore session from storage
+  const restoreSession = useCallback(async () => {
+    try {
+      const storedToken = await storage.getItem(TOKEN_STORAGE_KEY);
+      const storedRefreshToken = await storage.getItem(REFRESH_TOKEN_STORAGE_KEY);
+      const storedUser = await storage.getItem(USER_STORAGE_KEY);
+
+      if (storedToken && storedUser) {
+        // Restore state from storage immediately so the route guard sees
+        // the authenticated session without waiting for async verification
+        setToken(storedToken);
+        setRefreshToken(storedRefreshToken);
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        
+        // Unblock the route guard right away so it sees the restored token
+        setIsLoading(false);
+
+        // Verify token in background — don't block the UI
+        try {
+          const response = await authGetMe(storedToken);
+          if (response.user) {
+            setUser(response.user);
+            await storage.setItem(USER_STORAGE_KEY, JSON.stringify(response.user));
+          }
+        } catch {
+          // Token might be expired, try refresh in background
+          if (storedRefreshToken) {
+            try {
+              const newToken = await refreshAccessToken(storedRefreshToken);
+              if (newToken) {
+                // Refresh succeeded — user stays authenticated
+                return;
+              }
+            } catch {
+              // Both verification and refresh failed; clear invalid session
+            }
+          }
+          // Clear invalid session — route guard will redirect if already on protected page
+          await clearSession();
+        }
+
+        // Early return since we already set isLoading(false) above
+        return;
+      }
+    } catch (error) {
+      console.error('Failed to restore auth session', error);
+      await clearSession();
+    }
+
+    // Only reach here if no stored token was found — mark loading as complete
+    setIsLoading(false);
+  }, [clearSession, refreshAccessToken]);
 
   // Login
   const login = useCallback(async (userData: AuthUser, accessToken: string, newRefreshToken?: string) => {
@@ -200,51 +216,4 @@ export const useAuth = () => {
   }
   return context;
 };
-  }, []);
 
-  useEffect(() => {
-    // Protected routes logic
-    const publicPaths = ['/login', '/register', '/'];
-    if (!isLoading) {
-      if (!user && !publicPaths.includes(pathname)) {
-        router.push('/login');
-      } else if (user && (pathname === '/login' || pathname === '/register')) {
-        router.push('/discover');
-      }
-    }
-  }, [user, isLoading, pathname, router]);
-
-  const login = async (userData: User, tokenData: string) => {
-    setUser(userData);
-    setToken(tokenData);
-    await storage.setItem('sparklive_token', tokenData);
-    await storage.setItem('sparklive_user', JSON.stringify(userData));
-    router.push('/discover');
-  };
-
-  const logout = async () => {
-    setUser(null);
-    setToken(null);
-    await storage.removeItem('sparklive_token');
-    await storage.removeItem('sparklive_user');
-    router.push('/login');
-  };
-
-  return (
-    <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>
-      {!isLoading ? children : (
-        <div className="min-h-screen flex items-center justify-center bg-black">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[var(--color-spark-pink)]"></div>
-        </div>
-      )}
-    </AuthContext.Provider>
-  );
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};

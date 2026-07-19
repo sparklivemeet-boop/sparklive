@@ -1,0 +1,43 @@
+# =============================================================================
+# SparkLive AI Services - Production Docker Image
+# Python-based ML service for recommendations, moderation, etc.
+# =============================================================================
+
+FROM python:3.11-slim AS runner
+LABEL stage=sparklive-ai-production
+LABEL maintainer="SparkLive DevOps"
+LABEL description="SparkLive AI Services"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gcc \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN addgroup --system --gid 1001 appgroup && \
+    adduser --system --uid 1001 appuser && \
+    adduser appuser appgroup
+
+WORKDIR /app
+
+COPY backend/ai/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt && \
+    rm -rf ~/.cache/pip
+
+COPY backend/ai/ .
+
+RUN mkdir -p /app/models /app/data && \
+    chown -R appuser:appgroup /app
+
+USER appuser
+
+EXPOSE 5003
+
+ENV PYTHONUNBUFFERED=1
+ENV PORT=5003
+ENV MODEL_CACHE_DIR=/app/models
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:5003/health || exit 1
+
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5003", "--workers", "4"]

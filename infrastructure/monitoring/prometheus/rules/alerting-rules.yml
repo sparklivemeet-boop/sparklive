@@ -1,0 +1,229 @@
+# =============================================================================
+# SparkLive - Prometheus Alerting Rules
+# =============================================================================
+
+groups:
+  - name: sparklive-service-down
+    interval: 30s
+    rules:
+      - alert: BackendAPIDown
+        expr: up{job="sparklive-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Backend API is down"
+          description: "Backend API has been down for more than 1 minute."
+          runbook_url: "https://docs.sparklive.com/runbooks/backend-down"
+
+      - alert: FrontendDown
+        expr: up{job="sparklive-frontend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: frontend
+        annotations:
+          summary: "Frontend is down"
+          description: "Frontend has been down for more than 2 minutes."
+
+      - alert: WebSocketDown
+        expr: up{job="sparklive-websocket"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "WebSocket server is down"
+          description: "WebSocket server has been down for more than 1 minute."
+
+      - alert: WorkerDown
+        expr: up{job="sparklive-workers"} == 0
+        for: 2m
+        labels:
+          severity: high
+          team: backend
+        annotations:
+          summary: "Background worker is down"
+          description: "Background worker has been down for more than 2 minutes."
+
+  - name: sparklive-high-error-rate
+    interval: 1m
+    rules:
+      - alert: HighAPIErrorRate
+        expr: |
+          rate(http_requests_total{job="sparklive-backend", status=~"5.."}[5m])
+          /
+          rate(http_requests_total{job="sparklive-backend"}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "High API error rate ({{ $value | humanizePercentage }})"
+          description: "API error rate is {{ $value | humanizePercentage }} for the last 5 minutes (threshold: 5%)."
+
+      - alert: HighPaymentErrorRate
+        expr: |
+          rate(payment_errors_total{job="sparklive-backend"}[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+          team: payments
+        annotations:
+          summary: "High payment error rate"
+          description: "Payment errors are occurring at a rate of {{ $value | humanize }} per second."
+
+      - alert: HighUploadFailureRate
+        expr: |
+          rate(upload_failures_total{job="sparklive-backend"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: high
+          team: backend
+        annotations:
+          summary: "High upload failure rate"
+          description: "Upload failure rate is {{ $value | humanize }} per second."
+
+  - name: sparklive-resource-exhaustion
+    interval: 1m
+    rules:
+      - alert: HighCPUUsage
+        expr: |
+          sum(rate(container_cpu_usage_seconds_total{namespace="sparklive"}[5m]))
+          /
+          sum(kube_pod_container_resource_limits{namespace="sparklive", resource="cpu"}) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "High CPU usage in SparkLive namespace"
+          description: "CPU usage is {{ $value | humanizePercentage }} of total limits."
+
+      - alert: HighMemoryUsage
+        expr: |
+          sum(container_memory_working_set_bytes{namespace="sparklive"})
+          /
+          sum(kube_pod_container_resource_limits{namespace="sparklive", resource="memory"}) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "High memory usage in SparkLive namespace"
+          description: "Memory usage is {{ $value | humanizePercentage }} of total limits."
+
+      - alert: DiskSpaceRunningOut
+        expr: |
+          node_filesystem_avail_bytes{mountpoint="/", fstype!="tmpfs"}
+          /
+          node_filesystem_size_bytes{mountpoint="/", fstype!="tmpfs"} < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Disk space is running out"
+          description: "Disk usage is above 90% on {{ $labels.instance }}."
+
+      - alert: DatabaseHighConnections
+        expr: |
+          pg_stat_database_numbackends{job="postgres-exporter", datname="sparklive"} > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High database connections"
+          description: "Database has {{ $value }} active connections (threshold: 80)."
+
+      - alert: RedisMemoryUsageHigh
+        expr: |
+          redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Redis memory usage high"
+          description: "Redis is using {{ $value | humanizePercentage }} of max memory."
+
+  - name: sparklive-latency
+    interval: 1m
+    rules:
+      - alert: HighAPILatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{job="sparklive-backend"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High API latency (P95 > 1s)"
+          description: "P95 API latency is {{ $value }}s for the last 5 minutes."
+
+      - alert: HighDatabaseLatency
+        expr: |
+          pg_stat_database_blk_read_time{job="postgres-exporter", datname="sparklive"} > 1
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High database read latency"
+          description: "Database read latency is {{ $value }}ms."
+
+  - name: sparklive-streaming
+    interval: 1m
+    rules:
+      - alert: LiveStreamFailures
+        expr: |
+          rate(live_stream_failures_total{job="sparklive-backend"}[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          team: streaming
+        annotations:
+          summary: "Live stream failures detected"
+          description: "Live streams are failing at a rate of {{ $value | humanize }} per second."
+
+      - alert: HighWebSocketConnectionDropRate
+        expr: |
+          rate(websocket_disconnections_total{job="sparklive-websocket"}[5m])
+          /
+          rate(websocket_connections_total{job="sparklive-websocket"}[5m]) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High WebSocket disconnection rate"
+          description: "WebSocket disconnection rate is {{ $value | humanizePercentage }}."
+
+  - name: sparklive-security
+    interval: 5m
+    rules:
+      - alert: RateLimitExceeded
+        expr: |
+          rate(rate_limit_exceeded_total{job="sparklive-backend"}[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Rate limit being hit frequently"
+          description: "Rate limit exceeded {{ $value | humanize }} times per second."
+
+      - alert: FailedLoginAttempts
+        expr: |
+          rate(auth_failures_total{job="sparklive-backend"}[5m]) > 5
+        for: 5m
+        labels:
+          severity: high
+          team: security
+        annotations:
+          summary: "High number of failed login attempts"
+          description: "Failed login rate is {{ $value | humanize }} per second."

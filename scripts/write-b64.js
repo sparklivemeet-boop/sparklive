@@ -1,0 +1,1 @@
+const fs=require("fs");const p=process.argv[2];const b64=process.argv[3];fs.writeFileSync(p,Buffer.from(b64,"base64"),"utf8");console.log("Written: "+p);

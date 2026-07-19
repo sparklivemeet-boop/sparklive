@@ -43,8 +43,8 @@ export class ChatService {
     });
 
     const enriched = await Promise.all(
-      conversations.map(async (conversation) => {
-        const partner = conversation.participants.find((p) => p.userId !== userId)?.user;
+      conversations.map(async (conversation: any) => {
+        const partner = conversation.participants.find((p: any) => p.userId !== userId)?.user;
         const unreadCount = await prisma.message.count({
           where: {
             conversationId: conversation.id,
@@ -76,7 +76,7 @@ export class ChatService {
       },
     });
 
-    if (!conversation || !conversation.participants.some((p) => p.userId === userId)) {
+    if (!conversation || !conversation.participants.some((p: any) => p.userId === userId)) {
       throw new Error("Conversation not found or unauthorized");
     }
 
@@ -102,7 +102,7 @@ export class ChatService {
       include: { participants: true },
     });
 
-    if (!conversation || !conversation.participants.some((p) => p.userId === senderId)) {
+    if (!conversation || !conversation.participants.some((p: any) => p.userId === senderId)) {
       throw new Error("Conversation not found or unauthorized");
     }
 
@@ -129,7 +129,7 @@ export class ChatService {
       include: { participants: true },
     });
 
-    if (!conversation || !conversation.participants.some((p) => p.userId === userId)) {
+    if (!conversation || !conversation.participants.some((p: any) => p.userId === userId)) {
       throw new Error("Conversation not found or unauthorized");
     }
 
@@ -156,7 +156,7 @@ export class ChatService {
       include: { participants: true },
     });
 
-    if (!conversation || !conversation.participants.some((p) => p.userId === userId)) {
+    if (!conversation || !conversation.participants.some((p: any) => p.userId === userId)) {
       throw new Error("Conversation not found or unauthorized");
     }
 

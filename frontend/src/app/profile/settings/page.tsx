@@ -2,9 +2,19 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Sparkles, Bell, Lock, X } from 'lucide-react';
+import {
+  Shield, Sparkles, Bell, Lock, X, ArrowLeft, User, Eye, Globe,
+  Monitor, Smartphone, LogOut, Trash2, Moon, Sun, CheckCircle2,
+  AlertTriangle, Loader2, Users, MessageCircle, Ban, VolumeX,
+  ChevronRight, Settings as SettingsIcon,
+} from 'lucide-react';
+import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/apiClient';
+import GradientButton from '@/components/ui/GradientButton';
+import GlassCard from '@/components/ui/GlassCard';
+import { cn } from '@/lib/utils';
 
 interface ProfileData {
   id: string;
@@ -12,12 +22,6 @@ interface ProfileData {
   email?: string | null;
   fullName?: string | null;
   avatarUrl?: string | null;
-  bannerUrl?: string | null;
-  bio?: string | null;
-  website?: string | null;
-  city?: string | null;
-  country?: string | null;
-  socialLinks?: { id: string; platform: string; url: string }[];
 }
 
 interface PrivacySettings {
@@ -47,14 +51,92 @@ interface UserReference {
   username: string;
 }
 
+/* ─────────────────────────────────────────────
+   Settings Section Wrapper
+   ───────────────────────────────────────────── */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type IconComp = React.ComponentType<any>;
+
+function SettingsSection({ title, subtitle, icon: Icon, children }: {
+  title: string;
+  subtitle?: string;
+  icon: IconComp;
+  children: React.ReactNode;
+}) {
+  return (
+    <GlassCard padding="xl">
+      <div className="flex items-start gap-4 mb-6">
+        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#ff007f]/20 to-[#7a00cc]/20 flex items-center justify-center shrink-0">
+          <Icon size={18} className="text-[#ff007f]" aria-hidden="true" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-white">{title}</h2>
+          {subtitle && <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>}
+        </div>
+      </div>
+      {children}
+    </GlassCard>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   Toast Notification
+   ───────────────────────────────────────────── */
+
+function Toast({ message, type = 'success', onClose }: {
+  message: string;
+  type?: 'success' | 'error';
+  onClose: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className={cn(
+        'fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl border backdrop-blur-xl',
+        type === 'success'
+          ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+          : 'bg-red-500/20 border-red-500/30 text-red-300'
+      )}
+      role="alert"
+    >
+      {type === 'success' ? (
+        <CheckCircle2 size={18} className="shrink-0" />
+      ) : (
+        <AlertTriangle size={18} className="shrink-0" />
+      )}
+      <p className="text-sm font-medium">{message}</p>
+      <button onClick={onClose} className="ml-2 hover:text-white transition" aria-label="Dismiss">
+        <X size={14} />
+      </button>
+    </motion.div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   Main Page
+   ───────────────────────────────────────────── */
+
 export default function ProfileSettingsPage() {
   const router = useRouter();
   const { token, logout } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [privacy, setPrivacy] = useState<PrivacySettings>({ theme: 'dark', privacyProfile: 'public', privacyMessages: 'everyone', privacyFollows: 'everyone' });
-  const [notifications, setNotifications] = useState<NotificationPreferences>({ emailAlerts: true, pushAlerts: true, chatAlerts: true, liveAlerts: true });
+  const [privacy, setPrivacy] = useState<PrivacySettings>({
+    theme: 'dark',
+    privacyProfile: 'public',
+    privacyMessages: 'everyone',
+    privacyFollows: 'everyone',
+  });
+  const [notifications, setNotifications] = useState<NotificationPreferences>({
+    emailAlerts: true,
+    pushAlerts: true,
+    chatAlerts: true,
+    liveAlerts: true,
+  });
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [blockedUsers, setBlockedUsers] = useState<UserReference[]>([]);
   const [mutedUsers, setMutedUsers] = useState<UserReference[]>([]);
@@ -63,16 +145,18 @@ export default function ProfileSettingsPage() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [blockTarget, setBlockTarget] = useState('');
   const [muteTarget, setMuteTarget] = useState('');
-  const [success, setSuccess] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
 
   const themeLabel = useMemo(() => (privacy.theme === 'dark' ? 'Dark mode' : 'Light mode'), [privacy.theme]);
 
   const loadSettings = async () => {
     if (!token) return;
     setLoading(true);
-    setError(null);
-
     try {
       const [profileData, privacyData, notificationsData, sessionsData, blockedData, mutedData] = await Promise.all([
         apiGet<ProfileData>('/api/profiles/me', token),
@@ -90,9 +174,8 @@ export default function ProfileSettingsPage() {
       setSessions(sessionsData.sessions || []);
       setBlockedUsers(blockedData.blocked || []);
       setMutedUsers(mutedData.muted || []);
-    } catch (err) {
-      setError('Unable to load settings.');
-      console.error(err);
+    } catch {
+      showToast('Unable to load settings.', 'error');
     } finally {
       setLoading(false);
     }
@@ -102,373 +185,484 @@ export default function ProfileSettingsPage() {
     loadSettings();
   }, [token]);
 
-  const showToast = (message: string) => {
-    setSuccess(message);
-    window.setTimeout(() => setSuccess(null), 4000);
+  const withSaving = async (key: string, fn: () => Promise<void>) => {
+    setSaving(key);
+    try {
+      await fn();
+    } catch (err) {
+      showToast((err as Error).message || 'Operation failed', 'error');
+    } finally {
+      setSaving(null);
+    }
   };
 
   const handleSavePrivacy = async () => {
     if (!token) return;
-    setSaving(true);
-    setError(null);
-    try {
+    await withSaving('privacy', async () => {
       await apiPut('/api/settings/privacy', privacy, token);
       showToast('Privacy settings saved');
-    } catch (err) {
-      setError((err as Error).message || 'Unable to save privacy settings');
-    } finally {
-      setSaving(false);
-    }
+    });
   };
 
   const handleSaveNotifications = async () => {
     if (!token) return;
-    setSaving(true);
-    setError(null);
-    try {
+    await withSaving('notifications', async () => {
       await apiPut('/api/settings/notifications', notifications, token);
       showToast('Notification preferences saved');
-    } catch (err) {
-      setError((err as Error).message || 'Unable to save notification preferences');
-    } finally {
-      setSaving(false);
-    }
+    });
   };
 
   const handleSaveAccount = async () => {
     if (!token) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await apiPut('/api/settings/account', { email: accountEmail, currentPassword: currentPassword || undefined, newPassword: newPassword || undefined }, token);
+    await withSaving('account', async () => {
+      await apiPut('/api/settings/account', {
+        email: accountEmail,
+        currentPassword: currentPassword || undefined,
+        newPassword: newPassword || undefined,
+      }, token);
       showToast('Account settings updated');
       setCurrentPassword('');
       setNewPassword('');
-    } catch (err) {
-      setError((err as Error).message || 'Unable to update account settings');
-    } finally {
-      setSaving(false);
-    }
+    });
   };
 
   const handleLogoutAll = async () => {
     if (!token) return;
-    setSaving(true);
-    setError(null);
-    try {
+    await withSaving('logoutAll', async () => {
       await apiDelete('/api/settings/sessions', token);
       logout();
-    } catch (err) {
-      setError((err as Error).message || 'Unable to log out all sessions');
-    } finally {
-      setSaving(false);
-    }
+    });
   };
 
   const handleRevokeSession = async (sessionId: string) => {
     if (!token) return;
-    setSaving(true);
-    setError(null);
-    try {
+    await withSaving(`session-${sessionId}`, async () => {
       await apiDelete(`/api/settings/sessions/${sessionId}`, token);
-      await loadSettings();
+      setSessions(prev => prev.filter(s => s.id !== sessionId));
       showToast('Session revoked');
-    } catch (err) {
-      setError((err as Error).message || 'Unable to revoke session');
-    } finally {
-      setSaving(false);
-    }
+    });
   };
 
   const handleBlockUser = async () => {
     if (!token || !blockTarget.trim()) return;
-    setSaving(true);
-    setError(null);
-    try {
+    await withSaving('block', async () => {
       await apiPost('/api/settings/blocked', { targetUsername: blockTarget.trim() }, token);
       setBlockTarget('');
       await loadSettings();
       showToast('User blocked');
-    } catch (err) {
-      setError((err as Error).message || 'Unable to block user');
-    } finally {
-      setSaving(false);
-    }
+    });
+  };
+
+  const handleUnblockUser = async (userId: string) => {
+    if (!token) return;
+    await withSaving(`unblock-${userId}`, async () => {
+      await apiDelete(`/api/settings/blocked/${userId}`, token);
+      setBlockedUsers(prev => prev.filter(u => u.id !== userId));
+      showToast('User unblocked');
+    });
   };
 
   const handleMuteUser = async () => {
     if (!token || !muteTarget.trim()) return;
-    setSaving(true);
-    setError(null);
-    try {
+    await withSaving('mute', async () => {
       await apiPost('/api/settings/muted', { targetUsername: muteTarget.trim() }, token);
       setMuteTarget('');
       await loadSettings();
       showToast('User muted');
-    } catch (err) {
-      setError((err as Error).message || 'Unable to mute user');
-    } finally {
-      setSaving(false);
-    }
+    });
+  };
+
+  const handleUnmuteUser = async (userId: string) => {
+    if (!token) return;
+    await withSaving(`unmute-${userId}`, async () => {
+      await apiDelete(`/api/settings/muted/${userId}`, token);
+      setMutedUsers(prev => prev.filter(u => u.id !== userId));
+      showToast('User unmuted');
+    });
   };
 
   const handleDeleteAccount = async () => {
     if (!token) return;
     const confirmed = window.confirm('Delete your account and all profile data? This action cannot be undone.');
     if (!confirmed) return;
-    setSaving(true);
-    setError(null);
-    try {
+    await withSaving('delete', async () => {
       await apiDelete('/api/settings/account', token);
       logout();
-    } catch (err) {
-      setError((err as Error).message || 'Unable to delete account');
-    } finally {
-      setSaving(false);
-    }
+    });
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-white/60" />
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-[#ff007f]/60" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#09090f] pb-10 text-white">
-      <div className="mx-auto max-w-[1400px] px-4 py-8 lg:px-6 xl:px-8">
-        <div className="mb-6 flex flex-col gap-4 rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_30px_120px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
+    <div className="min-h-screen pb-24 lg:pb-10 bg-[var(--background)]">
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      <div className="max-w-4xl mx-auto space-y-6 p-4 sm:p-6">
+        {/* Header */}
+        <div className="flex items-center gap-4">
+          <Link href="/profile">
+            <button
+              className="rounded-xl border border-white/[0.06] bg-white/[0.04] p-2.5 text-gray-400 hover:bg-white/[0.08] hover:text-white transition"
+              aria-label="Back to profile"
+            >
+              <ArrowLeft size={16} />
+            </button>
+          </Link>
           <div>
-            <p className="text-sm uppercase tracking-[0.3em] text-slate-400">Profile settings</p>
-            <h1 className="mt-2 text-4xl font-black text-white">Manage your SparkLive settings</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">Keep your account secure and personalize your profile, privacy, notifications, and active sessions.</p>
+            <h1 className="text-2xl font-bold text-white">Settings</h1>
+            <p className="text-sm text-gray-400">Manage your account, privacy, and preferences.</p>
           </div>
-          <button onClick={() => router.push('/profile')} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
-            <X size={16} /> Back to profile
-          </button>
+          {profile && (
+            <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] px-3 py-1.5 text-xs text-gray-400 border border-white/[0.06]">
+              <User size={12} aria-hidden="true" />
+              @{profile.username}
+            </span>
+          )}
         </div>
 
-        {error && <div className="mb-4 rounded-3xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200">{error}</div>}
-        {success && <div className="mb-4 rounded-3xl border border-emerald-400/20 bg-emerald-500/10 p-4 text-sm text-emerald-100">{success}</div>}
-
-        <div className="grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
+        <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+          {/* Left Column */}
           <div className="space-y-6">
-            <section className="rounded-[32px] border border-white/10 bg-black/50 p-6 shadow-[0_30px_90px_rgba(0,0,0,0.18)] backdrop-blur-xl">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm uppercase tracking-[0.3em] text-slate-400">Account</p>
-                  <h2 className="mt-2 text-2xl font-bold text-white">Profile & login</h2>
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-white/5 px-4 py-2 text-sm text-slate-300">
-                  <Sparkles size={18} /> {profile?.username}
-                </div>
-              </div>
-              <div className="mt-6 grid gap-4">
-                <label className="space-y-2 text-sm text-slate-300">
+            {/* Account Section */}
+            <SettingsSection title="Account" subtitle="Profile & login information" icon={User}>
+              <div className="space-y-4">
+                <label className="space-y-2 text-sm text-gray-300">
                   <span>Email address</span>
-                  <input value={accountEmail} onChange={(event) => setAccountEmail(event.target.value)} className="w-full rounded-3xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-fuchsia-500" />
+                  <input
+                    value={accountEmail}
+                    onChange={(e) => setAccountEmail(e.target.value)}
+                    className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-[#ff007f]/40 transition"
+                    type="email"
+                  />
                 </label>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="space-y-2 text-sm text-slate-300">
+                  <label className="space-y-2 text-sm text-gray-300">
                     <span>Current password</span>
-                    <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} className="w-full rounded-3xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-fuchsia-500" />
+                    <input
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-[#ff007f]/40 transition"
+                      placeholder="Leave blank to keep current"
+                    />
                   </label>
-                  <label className="space-y-2 text-sm text-slate-300">
+                  <label className="space-y-2 text-sm text-gray-300">
                     <span>New password</span>
-                    <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className="w-full rounded-3xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-fuchsia-500" />
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-[#ff007f]/40 transition"
+                      placeholder="Min 8 characters"
+                    />
                   </label>
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <button disabled={saving} onClick={handleSaveAccount} className="rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">Save account</button>
-                  <button disabled={saving} onClick={handleDeleteAccount} className="rounded-full border border-red-500/20 bg-red-500/10 px-5 py-3 text-sm font-semibold text-red-100 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50">Delete account</button>
+                <div className="flex items-center justify-between pt-2">
+                  <GradientButton
+                    variant="primary"
+                    size="sm"
+                    icon={saving === 'account' ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                    onClick={handleSaveAccount}
+                    disabled={saving === 'account'}
+                  >
+                    {saving === 'account' ? 'Saving...' : 'Save account'}
+                  </GradientButton>
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={!!saving}
+                    className="flex items-center gap-2 text-xs text-red-400 hover:text-red-300 transition disabled:opacity-50"
+                  >
+                    <Trash2 size={12} />
+                    Delete account
+                  </button>
                 </div>
               </div>
-            </section>
+            </SettingsSection>
 
-            <section className="rounded-[32px] border border-white/10 bg-black/50 p-6 shadow-[0_30px_90px_rgba(0,0,0,0.18)] backdrop-blur-xl">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm uppercase tracking-[0.3em] text-slate-400">Privacy</p>
-                  <h2 className="mt-2 text-2xl font-bold text-white">Profile visibility</h2>
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-white/5 px-4 py-2 text-sm text-slate-300">
-                  <Shield size={18} /> {privacy.privacyProfile === 'private' ? 'Private' : 'Public'}
-                </div>
-              </div>
-              <div className="mt-6 space-y-4">
-                <label className="space-y-2 text-sm text-slate-300">
+            {/* Privacy Section */}
+            <SettingsSection title="Privacy" subtitle="Profile visibility & permissions" icon={Eye}>
+              <div className="space-y-4">
+                <label className="space-y-2 text-sm text-gray-300">
                   <span>Profile visibility</span>
-                  <select value={privacy.privacyProfile} onChange={(event) => setPrivacy((prev) => ({ ...prev, privacyProfile: event.target.value }))} className="w-full rounded-3xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-fuchsia-500">
+                  <select
+                    value={privacy.privacyProfile}
+                    onChange={(e) => setPrivacy((prev) => ({ ...prev, privacyProfile: e.target.value }))}
+                    className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-[#ff007f]/40 transition"
+                  >
                     <option value="public">Public profile</option>
                     <option value="private">Private profile</option>
                   </select>
                 </label>
-                <label className="space-y-2 text-sm text-slate-300">
+                <label className="space-y-2 text-sm text-gray-300">
                   <span>Message permissions</span>
-                  <select value={privacy.privacyMessages} onChange={(event) => setPrivacy((prev) => ({ ...prev, privacyMessages: event.target.value }))} className="w-full rounded-3xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-fuchsia-500">
+                  <select
+                    value={privacy.privacyMessages}
+                    onChange={(e) => setPrivacy((prev) => ({ ...prev, privacyMessages: e.target.value }))}
+                    className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-[#ff007f]/40 transition"
+                  >
                     <option value="everyone">Everyone can message</option>
                     <option value="following">Only people I follow</option>
                     <option value="noone">No one can message</option>
                   </select>
                 </label>
-                <label className="space-y-2 text-sm text-slate-300">
+                <label className="space-y-2 text-sm text-gray-300">
                   <span>Follow permissions</span>
-                  <select value={privacy.privacyFollows} onChange={(event) => setPrivacy((prev) => ({ ...prev, privacyFollows: event.target.value }))} className="w-full rounded-3xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-fuchsia-500">
+                  <select
+                    value={privacy.privacyFollows}
+                    onChange={(e) => setPrivacy((prev) => ({ ...prev, privacyFollows: e.target.value }))}
+                    className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-[#ff007f]/40 transition"
+                  >
                     <option value="everyone">Everyone can follow</option>
                     <option value="followers">Only approved followers</option>
                     <option value="noone">No one can follow</option>
                   </select>
                 </label>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <button disabled={saving} onClick={handleSavePrivacy} className="rounded-full bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">Save privacy</button>
-                  <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300">{themeLabel}</div>
+                <div className="flex items-center justify-between pt-2">
+                  <GradientButton
+                    variant="primary"
+                    size="sm"
+                    icon={saving === 'privacy' ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                    onClick={handleSavePrivacy}
+                    disabled={saving === 'privacy'}
+                  >
+                    {saving === 'privacy' ? 'Saving...' : 'Save privacy'}
+                  </GradientButton>
+                  <span className="flex items-center gap-1.5 text-xs text-gray-500">
+                    {privacy.theme === 'dark' ? <Moon size={12} /> : <Sun size={12} />}
+                    {themeLabel}
+                  </span>
                 </div>
               </div>
-            </section>
+            </SettingsSection>
 
-            <section className="rounded-[32px] border border-white/10 bg-black/50 p-6 shadow-[0_30px_90px_rgba(0,0,0,0.18)] backdrop-blur-xl">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm uppercase tracking-[0.3em] text-slate-400">Notifications</p>
-                  <h2 className="mt-2 text-2xl font-bold text-white">Alerts & updates</h2>
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-white/5 px-4 py-2 text-sm text-slate-300">
-                  <Bell size={18} /> Notifications
-                </div>
-              </div>
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                {(['emailAlerts', 'pushAlerts', 'chatAlerts', 'liveAlerts'] as const).map((field) => (
-                  <label key={field} className="inline-flex items-center gap-3 rounded-3xl border border-white/10 bg-slate-900/80 px-4 py-4 text-sm text-slate-300 transition hover:border-fuchsia-500">
-                    <input type="checkbox" checked={Boolean(notifications[field])} onChange={(event) => setNotifications((prev) => ({ ...prev, [field]: event.target.checked }))} className="h-4 w-4 rounded border-white/20 bg-slate-900 text-fuchsia-500 focus:ring-fuchsia-500" />
-                    <span>{field === 'emailAlerts' ? 'Email alerts' : field === 'pushAlerts' ? 'Push notifications' : field === 'chatAlerts' ? 'Chat alerts' : 'Live stream alerts'}</span>
+            {/* Notifications Section */}
+            <SettingsSection title="Notifications" subtitle="Alerts & updates" icon={Bell}>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {([
+                  { key: 'emailAlerts', label: 'Email alerts', desc: 'Receive email notifications' },
+                  { key: 'pushAlerts', label: 'Push notifications', desc: 'Push alerts on your devices' },
+                  { key: 'chatAlerts', label: 'Chat alerts', desc: 'New message notifications' },
+                  { key: 'liveAlerts', label: 'Live stream alerts', desc: 'When creators go live' },
+                ] as const).map(({ key, label, desc }) => (
+                  <label
+                    key={key}
+                    className="flex items-start gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 transition hover:bg-white/[0.04] cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={Boolean(notifications[key as keyof NotificationPreferences])}
+                      onChange={(e) =>
+                        setNotifications((prev) => ({ ...prev, [key]: e.target.checked }))
+                      }
+                      className="mt-0.5 h-4 w-4 rounded border-white/20 bg-black/40 text-[#ff007f] focus:ring-[#ff007f]/30"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-white">{label}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+                    </div>
                   </label>
                 ))}
               </div>
-              <div className="mt-6 flex justify-end">
-                <button disabled={saving} onClick={handleSaveNotifications} className="rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">Save notifications</button>
+              <div className="flex justify-end pt-4">
+                <GradientButton
+                  variant="primary"
+                  size="sm"
+                  icon={saving === 'notifications' ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                  onClick={handleSaveNotifications}
+                  disabled={saving === 'notifications'}
+                >
+                  {saving === 'notifications' ? 'Saving...' : 'Save notifications'}
+                </GradientButton>
               </div>
-            </section>
+            </SettingsSection>
 
-            <section className="rounded-[32px] border border-white/10 bg-black/50 p-6 shadow-[0_30px_90px_rgba(0,0,0,0.18)] backdrop-blur-xl">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm uppercase tracking-[0.3em] text-slate-400">Session management</p>
-                  <h2 className="mt-2 text-2xl font-bold text-white">Active devices</h2>
-                </div>
-                <button disabled={saving} onClick={handleLogoutAll} className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">Logout all</button>
-              </div>
-              <div className="mt-6 space-y-4">
-                {sessions.length ? sessions.map((session) => (
-                  <div key={session.id} className="rounded-3xl border border-white/10 bg-black/40 p-5 text-sm text-slate-300">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-white">{session.userAgent || 'Unknown browser'}</p>
-                        <p className="mt-1 text-slate-400">IP: {session.ipAddress || 'Private'}</p>
+            {/* Sessions Section */}
+            <SettingsSection title="Active Sessions" subtitle="Devices & browsers" icon={Monitor}>
+              <div className="space-y-3">
+                {sessions.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-6">No active sessions.</p>
+                ) : (
+                  sessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Smartphone size={14} className="text-gray-500 shrink-0" aria-hidden="true" />
+                          <p className="text-sm font-medium text-white truncate">
+                            {session.userAgent || 'Unknown browser'}
+                          </p>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          IP: {session.ipAddress || 'Private'} · Started {new Date(session.createdAt).toLocaleDateString()}
+                        </p>
                       </div>
-                      <button disabled={saving} onClick={() => handleRevokeSession(session.id)} className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">Revoke</button>
+                      <button
+                        onClick={() => handleRevokeSession(session.id)}
+                        disabled={saving === `session-${session.id}`}
+                        className="shrink-0 rounded-xl border border-white/[0.06] px-3 py-1.5 text-xs text-gray-400 hover:bg-white/[0.05] hover:text-white transition disabled:opacity-50"
+                      >
+                        {saving === `session-${session.id}` ? 'Revoking...' : 'Revoke'}
+                      </button>
                     </div>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2 text-xs text-slate-500">
-                      <span>Started: {new Date(session.createdAt).toLocaleString()}</span>
-                      <span>Expires: {new Date(session.expiresAt).toLocaleString()}</span>
-                    </div>
-                  </div>
-                )) : (
-                  <div className="rounded-3xl border border-dashed border-white/10 bg-black/40 p-6 text-sm text-slate-400">No active sessions detected.</div>
+                  ))
                 )}
               </div>
-            </section>
+              {sessions.length > 0 && (
+                <div className="flex justify-end pt-4">
+                  <button
+                    onClick={handleLogoutAll}
+                    disabled={!!saving}
+                    className="flex items-center gap-2 rounded-xl border border-white/[0.06] px-4 py-2 text-xs text-gray-400 hover:bg-white/[0.05] hover:text-white transition disabled:opacity-50"
+                  >
+                    <LogOut size={12} />
+                    Logout all sessions
+                  </button>
+                </div>
+              )}
+            </SettingsSection>
 
-            <section className="rounded-[32px] border border-white/10 bg-black/50 p-6 shadow-[0_30px_90px_rgba(0,0,0,0.18)] backdrop-blur-xl">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm uppercase tracking-[0.3em] text-slate-400">Safety</p>
-                  <h2 className="mt-2 text-2xl font-bold text-white">Blocked & muted users</h2>
+            {/* Blocked & Muted Section */}
+            <SettingsSection title="Safety" subtitle="Blocked & muted users" icon={Lock}>
+              {/* Block User */}
+              <div className="space-y-3 mb-6">
+                <p className="text-sm font-medium text-white flex items-center gap-2">
+                  <Ban size={14} className="text-red-400" aria-hidden="true" />
+                  Blocked users
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    value={blockTarget}
+                    onChange={(e) => setBlockTarget(e.target.value)}
+                    placeholder="Enter username to block"
+                    className="flex-1 rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-[#ff007f]/40 transition"
+                    onKeyDown={(e) => e.key === 'Enter' && handleBlockUser()}
+                  />
+                  <GradientButton
+                    variant="danger"
+                    size="sm"
+                    onClick={handleBlockUser}
+                    disabled={saving === 'block' || !blockTarget.trim()}
+                  >
+                    {saving === 'block' ? '...' : 'Block'}
+                  </GradientButton>
                 </div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-white/5 px-4 py-2 text-sm text-slate-300">
-                  <Lock size={18} /> Protection
-                </div>
-              </div>
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <label className="space-y-2 text-sm text-slate-300">
-                  <span>Block username</span>
-                  <input value={blockTarget} onChange={(event) => setBlockTarget(event.target.value)} placeholder="Type username" className="w-full rounded-3xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-fuchsia-500" />
-                </label>
-                <button disabled={saving} onClick={handleBlockUser} className="self-end rounded-full bg-gradient-to-r from-pink-500 to-violet-500 px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">Block user</button>
-              </div>
-              <div className="mt-6 space-y-4">
-                {blockedUsers.length ? blockedUsers.map((user) => (
-                  <div key={user.id} className="flex items-center justify-between gap-3 rounded-3xl border border-white/10 bg-black/40 px-4 py-4 text-sm text-slate-300">
-                    <span>{user.username}</span>
-                    <button disabled={saving} onClick={async () => {
-                      if (!token) return;
-                      setSaving(true);
-                      setError(null);
-                      try {
-                        await apiDelete(`/api/settings/blocked/${user.id}`, token);
-                        await loadSettings();
-                        showToast('User unblocked');
-                      } catch (err) {
-                        setError((err as Error).message || 'Unable to unblock user');
-                      } finally {
-                        setSaving(false);
-                      }
-                    }} className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">Unblock</button>
+                {blockedUsers.length > 0 ? (
+                  <div className="space-y-2">
+                    {blockedUsers.map((u) => (
+                      <div key={u.id} className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                        <span className="text-sm text-gray-300">@{u.username}</span>
+                        <button
+                          onClick={() => handleUnblockUser(u.id)}
+                          disabled={saving === `unblock-${u.id}`}
+                          className="text-xs text-gray-500 hover:text-white transition disabled:opacity-50"
+                        >
+                          {saving === `unblock-${u.id}` ? '...' : 'Unblock'}
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                )) : (
-                  <div className="rounded-3xl border border-dashed border-white/10 bg-black/40 p-6 text-sm text-slate-400">No blocked accounts.</div>
+                ) : (
+                  <p className="text-xs text-gray-500 mt-2">No blocked accounts.</p>
                 )}
               </div>
-              <div className="mt-8 grid gap-4 sm:grid-cols-2">
-                <label className="space-y-2 text-sm text-slate-300">
-                  <span>Mute username</span>
-                  <input value={muteTarget} onChange={(event) => setMuteTarget(event.target.value)} placeholder="Type username" className="w-full rounded-3xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-fuchsia-500" />
-                </label>
-                <button disabled={saving} onClick={handleMuteUser} className="self-end rounded-full bg-gradient-to-r from-sky-500 to-cyan-500 px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">Mute user</button>
-              </div>
-              <div className="mt-6 space-y-4">
-                {mutedUsers.length ? mutedUsers.map((user) => (
-                  <div key={user.id} className="flex items-center justify-between gap-3 rounded-3xl border border-white/10 bg-black/40 px-4 py-4 text-sm text-slate-300">
-                    <span>{user.username}</span>
-                    <button disabled={saving} onClick={async () => {
-                      if (!token) return;
-                      setSaving(true);
-                      setError(null);
-                      try {
-                        await apiDelete(`/api/settings/muted/${user.id}`, token);
-                        await loadSettings();
-                        showToast('User unmuted');
-                      } catch (err) {
-                        setError((err as Error).message || 'Unable to unmute user');
-                      } finally {
-                        setSaving(false);
-                      }
-                    }} className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">Unmute</button>
+
+              {/* Mute User */}
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-white flex items-center gap-2">
+                  <VolumeX size={14} className="text-yellow-400" aria-hidden="true" />
+                  Muted users
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    value={muteTarget}
+                    onChange={(e) => setMuteTarget(e.target.value)}
+                    placeholder="Enter username to mute"
+                    className="flex-1 rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-[#ff007f]/40 transition"
+                    onKeyDown={(e) => e.key === 'Enter' && handleMuteUser()}
+                  />
+                  <GradientButton
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleMuteUser}
+                    disabled={saving === 'mute' || !muteTarget.trim()}
+                  >
+                    {saving === 'mute' ? '...' : 'Mute'}
+                  </GradientButton>
+                </div>
+                {mutedUsers.length > 0 ? (
+                  <div className="space-y-2">
+                    {mutedUsers.map((u) => (
+                      <div key={u.id} className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                        <span className="text-sm text-gray-300">@{u.username}</span>
+                        <button
+                          onClick={() => handleUnmuteUser(u.id)}
+                          disabled={saving === `unmute-${u.id}`}
+                          className="text-xs text-gray-500 hover:text-white transition disabled:opacity-50"
+                        >
+                          {saving === `unmute-${u.id}` ? '...' : 'Unmute'}
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                )) : (
-                  <div className="rounded-3xl border border-dashed border-white/10 bg-black/40 p-6 text-sm text-slate-400">No muted accounts.</div>
+                ) : (
+                  <p className="text-xs text-gray-500 mt-2">No muted accounts.</p>
                 )}
               </div>
-            </section>
+            </SettingsSection>
           </div>
 
+          {/* Right Column - Quick Actions */}
           <aside className="space-y-6">
-            <section className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_30px_90px_rgba(0,0,0,0.18)] backdrop-blur-xl">
-              <p className="text-sm uppercase tracking-[0.3em] text-slate-400">Quick actions</p>
-              <div className="mt-6 space-y-4 text-sm text-slate-300">
-                <button onClick={() => router.push('/profile')} className="w-full rounded-3xl border border-white/10 bg-black/40 px-4 py-4 text-left text-white transition hover:bg-white/5">Return to profile</button>
-                <button onClick={handleLogoutAll} disabled={saving} className="w-full rounded-3xl bg-gradient-to-r from-red-500 to-orange-500 px-4 py-4 text-left text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">Logout all sessions</button>
+            <GlassCard padding="xl">
+              <div className="flex items-center gap-3 mb-4">
+                <SettingsIcon size={18} className="text-gray-400" aria-hidden="true" />
+                <h2 className="text-sm font-bold text-white">Quick actions</h2>
               </div>
-            </section>
+              <div className="space-y-2">
+                <Link href="/profile">
+                  <button className="w-full flex items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-sm text-gray-300 hover:bg-white/[0.04] hover:text-white transition">
+                    <span>Return to profile</span>
+                    <ChevronRight size={14} className="text-gray-600" />
+                  </button>
+                </Link>
+                <button
+                  onClick={handleLogoutAll}
+                  disabled={!!saving}
+                  className="w-full flex items-center justify-between rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300 hover:bg-red-500/20 transition disabled:opacity-50"
+                >
+                  <span>Logout all sessions</span>
+                  <LogOut size={14} />
+                </button>
+              </div>
+            </GlassCard>
 
-            <section className="rounded-[32px] border border-white/10 bg-black/50 p-6 shadow-[0_30px_90px_rgba(0,0,0,0.18)] backdrop-blur-xl">
-              <p className="text-sm uppercase tracking-[0.3em] text-slate-400">Security logs</p>
-              <div className="mt-6 rounded-3xl border border-white/10 bg-slate-900/80 p-4 text-sm text-slate-300">
-                <p className="text-sm text-slate-400">Recent changes and account access appear here once available.</p>
-                <p className="mt-3 text-slate-500">This helps you monitor logins, password updates, and profile changes.</p>
+            <GlassCard padding="xl">
+              <div className="flex items-center gap-3 mb-4">
+                <Shield size={18} className="text-gray-400" aria-hidden="true" />
+                <h2 className="text-sm font-bold text-white">Security</h2>
               </div>
-            </section>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Review your security logs regularly to monitor logins, password updates, and profile changes. 
+                Enable two-factor authentication for enhanced account protection.
+              </p>
+            </GlassCard>
           </aside>
         </div>
       </div>

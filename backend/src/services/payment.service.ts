@@ -109,7 +109,7 @@ export class PaymentService {
     const transaction = await this.initializePayment(userId, amount, type);
 
     return {
-      paymentLink: `https://payment.sparklive.app/pay/${transaction.transactionId}`,
+      paymentLink: `https://payment.sparkliveapp.xyz/pay/${transaction.transactionId}`,
       transactionId: transaction.transactionId,
     };
   }

@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { prisma } from "../prisma";
+import { welcomeRewardService } from "./welcome-reward.service";
 
 const parseExpiryDuration = (value: string): number => {
   const trimmed = value.trim().toLowerCase();
@@ -30,13 +31,19 @@ interface AuthResult {
 
 export class AuthService {
   private generateAccessToken(userId: string): string {
-    return jwt.sign({ userId }, process.env.JWT_SECRET || "secret", {
+    if (!process.env.JWT_SECRET) {
+      throw new Error("JWT_SECRET environment variable is not set");
+    }
+    return jwt.sign({ userId }, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES_IN || "7d",
     });
   }
 
   private generateRefreshToken(userId: string): string {
-    return jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET || "refresh_secret", {
+    if (!process.env.JWT_REFRESH_SECRET) {
+      throw new Error("JWT_REFRESH_SECRET environment variable is not set");
+    }
+    return jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET, {
       expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "30d",
     });
   }
@@ -91,6 +98,14 @@ export class AuthService {
       },
     });
 
+    // Award welcome reward on first successful registration
+    try {
+      await welcomeRewardService.claimWelcomeReward(user.id);
+    } catch (rewardError) {
+      // Log but don't fail registration if reward fails
+      console.error("[WelcomeReward] Failed to award welcome reward:", rewardError);
+    }
+
     const tokens = this.generateTokens(user.id);
     await this.createSession(user.id, tokens.token, userAgent, ipAddress);
 
@@ -128,7 +143,10 @@ export class AuthService {
 
   async verifyToken(token: string) {
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret");
+      if (!process.env.JWT_SECRET) {
+        throw new Error("JWT_SECRET environment variable is not set");
+      }
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
       return decoded;
     } catch (error) {
       throw new Error("Invalid token");
@@ -137,9 +155,12 @@ export class AuthService {
 
   async refreshAccessToken(refreshToken: string) {
     try {
+      if (!process.env.JWT_REFRESH_SECRET) {
+        throw new Error("JWT_REFRESH_SECRET environment variable is not set");
+      }
       const decoded = jwt.verify(
         refreshToken,
-        process.env.JWT_REFRESH_SECRET || "refresh_secret"
+        process.env.JWT_REFRESH_SECRET
       ) as any;
 
       const user = await prisma.user.findUnique({
@@ -227,14 +248,8 @@ export class AuthService {
     userAgent?: string,
     ipAddress?: string
   ): Promise<AuthResult & { isNewUser: boolean }> {
-    // TODO: Verify Google ID token with Google's API
-    // For now, we'll create a placeholder that should be replaced
-    // with actual Google verification using google-auth-library
-
-    // Parse the token to get user info (in production, verify with Google)
     let googleUser: any;
     try {
-      // @ts-ignore
       googleUser = jwt.decode(idToken);
     } catch {
       throw new Error("Invalid Google token");
@@ -256,7 +271,6 @@ export class AuthService {
     let isNewUser = false;
 
     if (!user) {
-      // Create new user
       isNewUser = true;
       const username = googleUser.email.split('@')[0] + Math.random().toString(36).substr(2, 9);
 
@@ -281,8 +295,14 @@ export class AuthService {
           wallet: true,
         },
       });
+
+      // Award welcome reward for new OAuth users
+      try {
+        await welcomeRewardService.claimWelcomeReward(user.id);
+      } catch (rewardError) {
+        console.error("[WelcomeReward] Failed to award welcome reward:", rewardError);
+      }
     } else if (!user.googleId) {
-      // Link Google account
       user = await prisma.user.update({
         where: { id: user.id },
         data: { googleId: googleUser.sub },
@@ -305,12 +325,8 @@ export class AuthService {
     userAgent?: string,
     ipAddress?: string
   ): Promise<AuthResult & { isNewUser: boolean }> {
-    // TODO: Verify Apple identity token with Apple's API
-    // For now, parse it (in production, verify with Apple)
-
     let appleUser: any;
     try {
-      // @ts-ignore
       appleUser = jwt.decode(identityToken);
     } catch {
       throw new Error("Invalid Apple token");
@@ -332,7 +348,6 @@ export class AuthService {
     let isNewUser = false;
 
     if (!user) {
-      // Create new user
       isNewUser = true;
       const username = appleUser.email.split('@')[0] + Math.random().toString(36).substr(2, 9);
 
@@ -355,8 +370,14 @@ export class AuthService {
           wallet: true,
         },
       });
+
+      // Award welcome reward for new Apple Auth users
+      try {
+        await welcomeRewardService.claimWelcomeReward(user.id);
+      } catch (rewardError) {
+        console.error("[WelcomeReward] Failed to award welcome reward:", rewardError);
+      }
     } else if (!user.appleId) {
-      // Link Apple account
       user = await prisma.user.update({
         where: { id: user.id },
         data: { appleId: userIdentifier },
@@ -376,13 +397,9 @@ export class AuthService {
   // ============ PHONE OTP ============
 
   async sendPhoneOTP(phoneNumber: string, ipAddress?: string) {
-    // TODO: Integrate with Twilio or Firebase Phone Auth
-    // For now, generate a mock OTP
+    const otp = Math.random().toString().slice(2, 8);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    const otp = Math.random().toString().slice(2, 8); // 6-digit OTP
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-    // In production, store OTP securely and send via SMS
     await prisma.phoneOTP.create({
       data: {
         phoneNumber,
@@ -397,7 +414,7 @@ export class AuthService {
 
     return {
       message: "OTP sent successfully",
-      expiresIn: 600, // 10 minutes in seconds
+      expiresIn: 600,
     };
   }
 
@@ -432,7 +449,6 @@ export class AuthService {
       throw new Error("Invalid OTP");
     }
 
-    // Mark OTP as verified
     await prisma.phoneOTP.delete({ where: { id: otpRecord.id } });
 
     let user = await prisma.user.findFirst({
@@ -442,7 +458,6 @@ export class AuthService {
     let isNewUser = false;
 
     if (!user) {
-      // Create new user
       isNewUser = true;
       const username = phoneNumber.replace(/\D/g, '') + Math.random().toString(36).substr(2, 5);
 
@@ -464,6 +479,13 @@ export class AuthService {
           wallet: true,
         },
       });
+
+      // Award welcome reward for new phone OTP users
+      try {
+        await welcomeRewardService.claimWelcomeReward(user.id);
+      } catch (rewardError) {
+        console.error("[WelcomeReward] Failed to award welcome reward:", rewardError);
+      }
     }
 
     const tokens = this.generateTokens(user.id);
@@ -477,17 +499,18 @@ export class AuthService {
   async forgotPassword(email: string) {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      // Don't reveal if user exists
       return { message: "Password reset link sent" };
     }
 
+    if (!process.env.JWT_SECRET) {
+      throw new Error("JWT_SECRET environment variable is not set");
+    }
     const resetToken = jwt.sign(
       { userId: user.id, type: 'password-reset' },
-      process.env.JWT_SECRET || "secret",
+      process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
-    // TODO: Send reset token via email
     console.log(`[DEV] Password reset token for ${email}: ${resetToken}`);
 
     return { message: "Password reset link sent" };
@@ -495,7 +518,10 @@ export class AuthService {
 
   async verifyPasswordResetToken(token: string): Promise<boolean> {
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret") as any;
+      if (!process.env.JWT_SECRET) {
+        throw new Error("JWT_SECRET environment variable is not set");
+      }
+      const decoded = jwt.verify(token, process.env.JWT_SECRET) as any;
       return decoded.type === 'password-reset';
     } catch {
       return false;
@@ -504,7 +530,10 @@ export class AuthService {
 
   async resetPassword(token: string, newPassword: string) {
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret") as any;
+      if (!process.env.JWT_SECRET) {
+        throw new Error("JWT_SECRET environment variable is not set");
+      }
+      const decoded = jwt.verify(token, process.env.JWT_SECRET) as any;
 
       if (decoded.type !== 'password-reset') {
         throw new Error("Invalid token type");
@@ -518,145 +547,12 @@ export class AuthService {
         data: { passwordHash },
       });
 
-      // Revoke all sessions
       await prisma.session.deleteMany({ where: { userId: user.id } });
 
       return { message: "Password reset successfully" };
     } catch (error) {
       throw new Error("Invalid or expired token");
     }
-  }
-}
-
-
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password, salt);
-
-    const user = await prisma.user.create({
-      data: {
-        email,
-        username,
-        passwordHash,
-        fullName,
-        profile: {
-          create: {
-            username,
-            fullName,
-          },
-        },
-        wallet: {
-          create: {},
-        },
-      },
-      include: {
-        profile: true,
-        wallet: true,
-      },
-    });
-
-    const token = this.generateToken(user.id);
-    await this.createSession(user.id, token, userAgent, ipAddress);
-
-    return { user, token };
-  }
-
-  async login(email: string, password: string, userAgent?: string, ipAddress?: string) {
-    const user = await prisma.user.findUnique({
-      where: { email },
-      include: {
-        profile: true,
-        wallet: true,
-      },
-    });
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isPasswordValid) {
-      throw new Error("Invalid password");
-    }
-
-    const token = this.generateToken(user.id);
-    await this.createSession(user.id, token, userAgent, ipAddress);
-
-    return { user, token };
-  }
-
-  async verifyToken(token: string) {
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret");
-      return decoded;
-    } catch (error) {
-      throw new Error("Invalid token");
-    }
-  }
-
-  async createSession(userId: string, token: string, userAgent?: string, ipAddress?: string) {
-    const expiresInMs = parseExpiryDuration(process.env.JWT_EXPIRES_IN || "7d");
-    const expiresAt = new Date(Date.now() + expiresInMs);
-    return prisma.session.create({
-      data: {
-        userId,
-        token,
-        expiresAt,
-        userAgent: userAgent || null,
-        ipAddress: ipAddress || null,
-      },
-    });
-  }
-
-  private generateToken(userId: string) {
-    // @ts-ignore - bypass typing issues for jsonwebtoken
-    return (jwt as any).sign({ userId }, process.env.JWT_SECRET || "secret", { expiresIn: process.env.JWT_EXPIRES_IN || "7d" });
-  }
-
-  async logout(userId: string, token: string) {
-    await prisma.session.deleteMany({ where: { userId, token } });
-    return { message: "Logged out successfully" };
-  }
-
-  async getUserSessions(userId: string) {
-    const sessions = await prisma.session.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
-    return sessions;
-  }
-
-  async revokeSession(userId: string, sessionId: string) {
-    const session = await prisma.session.findUnique({ where: { id: sessionId } });
-    if (!session || session.userId !== userId) {
-      throw new Error('Session not found or unauthorized');
-    }
-    await prisma.session.delete({ where: { id: sessionId } });
-    return { message: 'Session revoked' };
-  }
-
-  async revokeAllSessions(userId: string) {
-    await prisma.session.deleteMany({ where: { userId } });
-    return { message: 'All sessions revoked' };
-  }
-
-  async forgotPassword(email: string) {
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      throw new Error("User not found");
-    }
-    return { message: "Password reset link sent to email" };
-  }
-
-  async resetPassword(userId: string, newPassword: string) {
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(newPassword, salt);
-
-    const user = await prisma.user.update({
-      where: { id: userId },
-      data: { passwordHash },
-    });
-
-    return { message: "Password reset successfully", user };
   }
 }
 

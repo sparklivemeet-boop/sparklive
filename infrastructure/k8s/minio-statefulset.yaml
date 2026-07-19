@@ -1,0 +1,156 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: minio
+spec:
+  serviceName: minio
+  replicas: 4
+  selector:
+    matchLabels:
+      app: sparklive
+      component: minio
+  template:
+    metadata:
+      labels:
+        app: sparklive
+        component: minio
+    spec:
+      priorityClassName: sparklive-high
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+        - name: minio
+          image: minio/minio:latest
+          args:
+            - server
+            - /data-{0...3}
+            - --console-address
+            - ":9001"
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: sparklive-secrets
+                  key: S3_ACCESS_KEY
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sparklive-secrets
+                  key: S3_SECRET_KEY
+            - name: MINIO_PROMETHEUS_AUTH_TYPE
+              value: public
+          ports:
+            - containerPort: 9000
+              name: api
+            - containerPort: 9001
+              name: console
+          resources:
+            requests:
+              cpu: "2"
+              memory: "4Gi"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: 9000
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 2
+          volumeMounts:
+            - name: data-0
+              mountPath: /data-0
+            - name: data-1
+              mountPath: /data-1
+            - name: data-2
+              mountPath: /data-2
+            - name: data-3
+              mountPath: /data-3
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      nodeSelector:
+        type: stateful
+  volumeClaimTemplates:
+    - metadata:
+        name: data-0
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 500Gi
+    - metadata:
+        name: data-1
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 500Gi
+    - metadata:
+        name: data-2
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 500Gi
+    - metadata:
+        name: data-3
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 500Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: minio
+spec:
+  ports:
+    - port: 9000
+      name: api
+    - port: 9001
+      name: console
+  selector:
+    app: sparklive
+    component: minio
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-console
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: minio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9001
+      name: console
+      targetPort: 9001
+  selector:
+    app: sparklive
+    component: minio

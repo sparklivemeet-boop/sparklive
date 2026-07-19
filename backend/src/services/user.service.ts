@@ -90,7 +90,7 @@ export class UserService {
         posts: user._count.posts,
         media: user.profile?.media.length || 0,
       },
-      latestPosts: user.posts.map((post) => ({
+      latestPosts: user.posts.map((post: any) => ({
         id: post.id,
         content: post.content,
         mediaUrl: post.mediaUrl,
@@ -295,8 +295,11 @@ export class UserService {
       const validLinks = socialLinks
         .filter((link: any) => link?.platform && link?.url)
         .map((link: any) => ({ platform: link.platform.trim(), url: ensureValidUrl(link.url) }));
+      // Delete existing social links first (deleteMany not supported inside upsert)
+      if (existingUser.profile?.id) {
+        await prisma.socialLink.deleteMany({ where: { profileId: existingUser.profile.id } });
+      }
       profileUpdates.socialLinks = {
-        deleteMany: {},
         create: validLinks,
       };
     }

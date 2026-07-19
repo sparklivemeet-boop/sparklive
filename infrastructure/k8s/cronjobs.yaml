@@ -1,0 +1,249 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: database-backup
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: backup
+spec:
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          priorityClassName: sparklive-background
+          serviceAccountName: sparklive-backup
+          containers:
+            - name: backup
+              image: sparklive/backup:latest
+              imagePullPolicy: IfNotPresent
+              envFrom:
+                - secretRef:
+                    name: sparklive-secrets
+                - configMapRef:
+                    name: sparklive-config
+              env:
+                - name: BACKUP_TYPE
+                  value: "full"
+                - name: S3_BACKUP_BUCKET
+                  value: "sparklive-backups"
+                - name: RETENTION_DAYS
+                  value: "30"
+              volumeMounts:
+                - name: backup-tmp
+                  mountPath: /backup
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "512Mi"
+                limits:
+                  cpu: "1"
+                  memory: "1Gi"
+          restartPolicy: Never
+          volumes:
+            - name: backup-tmp
+              emptyDir:
+                sizeLimit: "10Gi"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cache-warm
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: maintenance
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          priorityClassName: sparklive-background
+          containers:
+            - name: warmer
+              image: curlimages/curl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  curl -X POST http://backend-api:5000/api/cache/warm \
+                    -H "Content-Type: application/json" \
+                    -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "128Mi"
+                limits:
+                  cpu: "200m"
+                  memory: "256Mi"
+          restartPolicy: Never
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: temp-file-cleanup
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: maintenance
+spec:
+  schedule: "0 4 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          priorityClassName: sparklive-background
+          containers:
+            - name: cleanup
+              image: alpine:3.18
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  find /tmp -type f -atime +1 -delete 2>/dev/null || true
+                  find /app/public/uploads -type f -mtime +7 -delete 2>/dev/null || true
+                  echo "Cleanup complete"
+              resources:
+                requests:
+                  cpu: "50m"
+                  memory: "64Mi"
+                limits:
+                  cpu: "100m"
+                  memory: "128Mi"
+          restartPolicy: Never
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: log-rotation
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: maintenance
+spec:
+  schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          priorityClassName: sparklive-background
+          containers:
+            - name: logrotate
+              image: alpine:3.18
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  find /var/log -name "*.log" -size +100M -exec gzip {} \;
+                  find /var/log -name "*.gz" -mtime +7 -delete
+                  echo "Log rotation complete"
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "128Mi"
+                limits:
+                  cpu: "200m"
+                  memory: "256Mi"
+              volumeMounts:
+                - name: varlog
+                  mountPath: /var/log
+          restartPolicy: Never
+          volumes:
+            - name: varlog
+              emptyDir: {}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migrate
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: database
+spec:
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      priorityClassName: sparklive-high
+      serviceAccountName: sparklive-backend
+      initContainers:
+        - name: wait-for-db
+          image: alpine:3.18
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until nc -z postgres-primary 5432; do
+                echo "Waiting for database..."
+                sleep 2
+              done
+      containers:
+        - name: migrate
+          image: ${REGISTRY}/sparklive-backend:${IMAGE_TAG}
+          imagePullPolicy: Always
+          command:
+            - npx
+            - prisma
+            - migrate
+            - deploy
+          envFrom:
+            - secretRef:
+                name: sparklive-secrets
+            - configMapRef:
+                name: sparklive-config
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+      restartPolicy: Never
+  backoffLimit: 3
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-seed
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: database
+spec:
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      priorityClassName: sparklive-medium
+      serviceAccountName: sparklive-backend
+      containers:
+        - name: seed
+          image: ${REGISTRY}/sparklive-backend:${IMAGE_TAG}
+          imagePullPolicy: Always
+          command:
+            - npx
+            - prisma
+            - db
+            - seed
+          envFrom:
+            - secretRef:
+                name: sparklive-secrets
+            - configMapRef:
+                name: sparklive-config
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+      restartPolicy: Never
+  backoffLimit: 2

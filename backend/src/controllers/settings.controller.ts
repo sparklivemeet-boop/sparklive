@@ -134,7 +134,7 @@ export const getBlockedUsers = async (req: AuthRequest, res: Response): Promise<
     const userId = req.user?.userId;
     if (!userId) return handleUnauthorized(res);
     const blocked = await userService.getBlockedUsers(userId);
-    res.status(200).json({ blocked: blocked.map((item) => ({ id: item.target.id, username: item.target.username })) });
+    res.status(200).json({ blocked: blocked.map((item: any) => ({ id: item.target.id, username: item.target.username })) });
   } catch (error) {
     handleError(res, error);
   }
@@ -177,7 +177,7 @@ export const getMutedUsers = async (req: AuthRequest, res: Response): Promise<vo
     const userId = req.user?.userId;
     if (!userId) return handleUnauthorized(res);
     const muted = await userService.getMutedUsers(userId);
-    res.status(200).json({ muted: muted.map((item) => ({ id: item.target.id, username: item.target.username })) });
+    res.status(200).json({ muted: muted.map((item: any) => ({ id: item.target.id, username: item.target.username })) });
   } catch (error) {
     handleError(res, error);
   }

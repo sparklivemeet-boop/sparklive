@@ -22,7 +22,7 @@ import {
 import { authenticateJWT } from '../middleware/auth.middleware';
 
 const router = Router();
-const uploadDir = path.resolve(__dirname, '../public/uploads');
+const uploadDir = path.resolve(__dirname, '../../public/uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({

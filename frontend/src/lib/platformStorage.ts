@@ -1,21 +1,41 @@
-export const storage = (() => {
-  if (typeof window !== 'undefined' && 'electron' in window) {
-    return {
-      getItem: async (key: string) => {
-        return window.localStorage.getItem(key);
-      },
-      setItem: async (key: string, value: string) => {
-        return window.localStorage.setItem(key, value);
-      },
-      removeItem: async (key: string) => {
-        return window.localStorage.removeItem(key);
-      },
-    };
+/**
+ * Cross-platform storage abstraction.
+ * Uses localStorage on web, could be extended for Electron/React Native.
+ */
+
+interface StorageInterface {
+  getItem(key: string): Promise<string | null>;
+  setItem(key: string, value: string): Promise<void>;
+  removeItem(key: string): Promise<void>;
+}
+
+class WebStorage implements StorageInterface {
+  async getItem(key: string): Promise<string | null> {
+    if (typeof window === "undefined") return null;
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
   }
 
-  return {
-    getItem: async (key: string) => window.localStorage.getItem(key),
-    setItem: async (key: string, value: string) => window.localStorage.setItem(key, value),
-    removeItem: async (key: string) => window.localStorage.removeItem(key),
-  };
-})();
+  async setItem(key: string, value: string): Promise<void> {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      // Storage full or unavailable
+    }
+  }
+
+  async removeItem(key: string): Promise<void> {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // Ignore
+    }
+  }
+}
+
+export const storage = new WebStorage();

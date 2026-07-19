@@ -1,0 +1,78 @@
+groups:
+  - name: sparklive-recording-rules
+    interval: 1m
+    rules:
+      # API Metrics
+      - record: sparklive:api:request_rate:1m
+        expr: rate(http_requests_total{job="sparklive-backend"}[1m])
+
+      - record: sparklive:api:error_rate:1m
+        expr: rate(http_requests_total{job="sparklive-backend", status=~"5.."}[1m])
+
+      - record: sparklive:api:error_percentage:5m
+        expr: |
+          sum(rate(http_requests_total{job="sparklive-backend", status=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total{job="sparklive-backend"}[5m]))
+          * 100
+
+      - record: sparklive:api:latency_p50:5m
+        expr: histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket{job="sparklive-backend"}[5m])) by (le))
+
+      - record: sparklive:api:latency_p95:5m
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job="sparklive-backend"}[5m])) by (le))
+
+      - record: sparklive:api:latency_p99:5m
+        expr: histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job="sparklive-backend"}[5m])) by (le))
+
+      - record: sparklive:api:requests_total:rate5m
+        expr: sum(rate(http_requests_total{job="sparklive-backend"}[5m]))
+
+      # Active Users
+      - record: sparklive:users:active:5m
+        expr: sum(rate(http_requests_total{job="sparklive-backend", path=~"/api/.*"}[5m]))
+
+      # Live Streams
+      - record: sparklive:streams:active:current
+        expr: live_streams_active
+
+      # WebSocket Connections
+      - record: sparklive:websocket:connections:current
+        expr: sum(websocket_connections_total{job="sparklive-websocket"})
+
+      - record: sparklive:websocket:connections_per_pod:current
+        expr: avg by (kubernetes_pod_name) (websocket_connections_total)
+
+      # Cache Hit Rate
+      - record: sparklive:cache:hit_rate:5m
+        expr: |
+          sum(rate(cache_hits_total{job="sparklive-backend"}[5m]))
+          /
+          (sum(rate(cache_hits_total{job="sparklive-backend"}[5m])) + sum(rate(cache_misses_total{job="sparklive-backend"}[5m])))
+          * 100
+
+      # Queue Depth
+      - record: sparklive:queue:depth:current
+        expr: queue_depth_total
+
+      # Database
+      - record: sparklive:database:connections:active
+        expr: pg_stat_database_numbackends{datname="sparklive"}
+
+      - record: sparklive:database:transactions:rate5m
+        expr: rate(pg_stat_database_xact_commit{datname="sparklive"}[5m])
+
+      # Redis
+      - record: sparklive:redis:memory_usage_percentage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes * 100
+
+      - record: sparklive:redis:hit_rate:5m
+        expr: |
+          rate(redis_keyspace_hits_total[5m])
+          /
+          (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))
+          * 100
+
+      # S3 Storage
+      - record: sparklive:s3:bucket_size_bytes
+        expr: s3_bucket_size_bytes

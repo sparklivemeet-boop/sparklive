@@ -424,40 +424,76 @@ Before each deploy, verify:
 - [ ] Session persists after refresh
 - [ ] Multiple concurrent logins work
 
-## Automated Testing (Future)
+## Automated Tests
 
-Consider implementing:
+### Backend Unit Tests (Jest + ts-jest)
 
-```bash
-# Jest for backend
-npm install --save-dev jest supertest
+The backend includes 11 comprehensive test files covering all services:
 
-# Playwright for end-to-end testing
-npm install --save-dev @playwright/test
-
-# Jest for frontend
-npm install --save-dev @testing-library/react
+```
+backend/src/__tests__/
+├── auth.service.test.ts      # Auth (register, login, JWT, OAuth, OTP, password reset)
+├── user.service.test.ts      # Users (profiles, settings, follow, block, mute)
+├── chat.service.test.ts      # Chat (conversations, messages, read receipts)
+├── wallet.service.test.ts    # Wallet (coins, withdrawals, premium subscriptions)
+├── payment.service.test.ts   # Payments (transactions, refunds, webhooks)
+├── gift.service.test.ts      # Gifts (send, history, balance updates)
+├── notification.service.test.ts # Notifications (CRUD, real-time, typed helpers)
+├── live.service.test.ts      # Live streams (start, end, chat, viewers, stats)
+├── security.test.ts          # Security (JWT, XSS, SQLi, CSRF, rate limiting, IDOR)
+├── websocket.test.ts         # WebSocket (chat events, call signaling, presence)
+└── integration.test.ts       # Integration (auth flows, wallet, stream lifecycle)
 ```
 
-Example test file:
-```javascript
-// __tests__/auth.test.ts
-describe('Authentication', () => {
-  test('should register new user', async () => {
-    const response = await fetch('http://localhost:5000/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: 'test@test.com',
-        username: 'testuser',
-        password: 'SecurePass123'
-      })
-    });
-    
-    expect(response.status).toBe(201);
-    const data = await response.json();
-    expect(data.token).toBeDefined();
-    expect(data.user.email).toBe('test@test.com');
-  });
-});
+**Run tests:**
+```bash
+cd backend
+npm test              # Run all tests
+npm run test:coverage # Run with coverage report
+npm run test:watch    # Watch mode
+npm run test:ci       # CI mode (coverage + max 2 workers)
+```
+
+**Requirements:** `jest`, `ts-jest`, `@types/jest`, `supertest`, `@types/supertest`
+
+### Load Testing
+
+```
+backend/load-test.js  # Simulates 100+ concurrent users against all endpoints
+```
+
+**Run:**
+```bash
+node backend/load-test.js
+# Or customize:
+CONCURRENCY=100 TARGET=http://localhost:5000 node backend/load-test.js
+```
+
+### Health Monitoring
+
+```
+backend/health-check.js  # Continuous health monitoring with alerts
+```
+
+**Run:**
+```bash
+node backend/health-check.js
+```
+
+## Test Coverage Summary
+
+| Category | Files | Tests |
+|----------|-------|-------|
+| **Unit Tests** | `auth.service.test.ts` | 25+ tests: register, login, verify, refresh, logout, sessions, OTP, OAuth, password reset |
+| | `user.service.test.ts` | 20+ tests: profiles, updates, settings, follow, block, mute, stats |
+| | `chat.service.test.ts` | 10+ tests: conversations, send, read receipts, search |
+| | `wallet.service.test.ts` | 10+ tests: balance, add/deduct coins, withdrawals, premium |
+| | `payment.service.test.ts` | 10+ tests: init, verify, refund, webhook, payment link |
+| | `gift.service.test.ts` | 5+ tests: send gift, history, insufficient balance |
+| | `notification.service.test.ts` | 10+ tests: CRUD, mark read, typed notifications |
+| | `live.service.test.ts` | 15+ tests: start, end, join, leave, chat, stats |
+| **Security Tests** | `security.test.ts` | 15+ tests: JWT, XSS, SQLi, CSRF, rate limiting, HMAC, IDOR |
+| **WebSocket Tests** | `websocket.test.ts` | 10+ tests: chat events, call signaling, presence, auth |
+| **Integration Tests** | `integration.test.ts` | 10+ tests: full user flows, data consistency |
+| **Total** | **11 files** | **~140+ test cases** |
 ```

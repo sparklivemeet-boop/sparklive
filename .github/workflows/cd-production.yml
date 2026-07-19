@@ -1,0 +1,172 @@
+name: SparkLive Production Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v2.1.0)'
+        required: true
+        type: string
+      deploy_strategy:
+        description: 'Deployment strategy'
+        required: true
+        default: 'blue-green'
+        type: choice
+        options:
+          - blue-green
+          - rolling
+          - canary
+
+env:
+  REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
+  IMAGE_TAG: ${{ github.sha }}
+  KUBE_CONFIG: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+  KUBE_NAMESPACE: sparklive
+  RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+
+jobs:
+  validate:
+    name: Pre-Deployment Validation
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate Version Tag
+        run: |
+          if [[ ! "${{ env.RELEASE_VERSION }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version format: ${{ env.RELEASE_VERSION }}"
+            echo "Must be in format: v1.2.3"
+            exit 1
+          fi
+
+      - name: Check CHANGELOG
+        run: |
+          if ! grep -q "${{ env.RELEASE_VERSION }}" CHANGELOG.md 2>/dev/null; then
+            echo "Warning: ${{ env.RELEASE_VERSION }} not found in CHANGELOG.md"
+          fi
+
+  ci-checks:
+    name: Full CI Suite
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+
+  deploy-production:
+    name: Deploy to Production (Blue-Green)
+    needs: ci-checks
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://sparklive.com
+    concurrency: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Configure Kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ env.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+
+      - name: Blue-Green Deploy
+        run: |
+          # Determine current active color
+          CURRENT_COLOR=$(kubectl get service frontend -n ${{ env.KUBE_NAMESPACE }} \
+            -o jsonpath='{.spec.selector.color}' || echo "blue")
+          NEW_COLOR=$([ "$CURRENT_COLOR" = "blue" ] && echo "green" || echo "blue")
+          echo "Current: $CURRENT_COLOR, Deploying: $NEW_COLOR"
+
+          # Update image tag
+          cd infrastructure/k8s
+          sed -i "s/image:.*frontend.*/image: ${REGISTRY}\/sparklive-frontend:${IMAGE_TAG}/" \
+            frontend-deployment.yaml
+          sed -i "s/image:.*backend.*/image: ${REGISTRY}\/sparklive-backend:${IMAGE_TAG}/" \
+            backend-deployment.yaml
+          sed -i "s/image:.*websocket.*/image: ${REGISTRY}\/sparklive-websocket:${IMAGE_TAG}/" \
+            websocket-deployment.yaml
+
+          # Add color label to the new deployments
+          kubectl patch deployment frontend -n ${{ env.KUBE_NAMESPACE }} \
+            -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"color\":\"${NEW_COLOR}\"}}}}}"
+          kubectl patch deployment backend-api -n ${{ env.KUBE_NAMESPACE }} \
+            -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"color\":\"${NEW_COLOR}\"}}}}}"
+
+          # Wait for new pods to be ready
+          kubectl rollout status deployment/frontend -n ${{ env.KUBE_NAMESPACE }} --timeout=10m
+          kubectl rollout status deployment/backend-api -n ${{ env.KUBE_NAMESPACE }} --timeout=10m
+          kubectl rollout status deployment/websocket -n ${{ env.KUBE_NAMESPACE }} --timeout=10m
+
+          # Switch traffic to new color
+          kubectl patch service frontend -n ${{ env.KUBE_NAMESPACE }} \
+            -p "{\"spec\":{\"selector\":{\"color\":\"${NEW_COLOR}\"}}}"
+
+          echo "DEPLOY_COLOR=${NEW_COLOR}" >> $GITHUB_ENV
+
+      - name: Post-Deployment Health Check
+        run: |
+          echo "Running health checks..."
+          sleep 30
+          for i in {1..10}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://sparklive.com/health)
+            if [ "$STATUS" = "200" ]; then
+              echo "Health check passed!"
+              break
+            fi
+            echo "Attempt $i: Health check returned $STATUS, retrying..."
+            sleep 10
+          done
+
+  rollback-guard:
+    name: Rollback on Failure
+    needs: deploy-production
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rollback to Previous Version
+        run: |
+          # Restore the service selector to the previous color
+          PREV_COLOR=$([ "${{ env.DEPLOY_COLOR }}" = "blue" ] && echo "green" || echo "blue")
+          kubectl patch service frontend -n ${{ env.KUBE_NAMESPACE }} \
+            -p "{\"spec\":{\"selector\":{\"color\":\"${PREV_COLOR}\"}}}"
+          echo "Rolled back to ${PREV_COLOR} deployment"
+
+  post-deploy-tests:
+    name: Production Validation Tests
+    needs: deploy-production
+    if: success()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run E2E Tests
+        run: |
+          cd backend
+          npm run test:e2e
+        env:
+          API_URL: https://api.sparklive.com
+          WS_URL: wss://ws.sparklive.com
+
+      - name: Performance Benchmark
+        run: |
+          ab -n 1000 -c 10 https://api.sparklive.com/health
+
+  notify:
+    name: Notify Team
+    needs: [post-deploy-tests, rollback-guard]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Slack Notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+          text: |
+            *SparkLive Production Deployment*
+            Version: ${{ env.RELEASE_VERSION }}
+            Status: ${{ job.status }}
+            Strategy: ${{ inputs.deploy_strategy }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

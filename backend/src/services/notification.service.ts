@@ -1,14 +1,29 @@
 import { prisma } from "../prisma";
 
+// Store reference to emit notifications via socket
+let ioRef: any = null;
+
+export const setNotificationIO = (io: any) => {
+  ioRef = io;
+};
+
+const emitToUser = (userId: string, event: string, data: any) => {
+  if (ioRef) {
+    ioRef.to(`user_${userId}`).emit(event, data);
+  }
+};
+
 export class NotificationService {
-  async getNotifications(userId: string, limit: number = 50) {
+  async getNotifications(userId: string, limit: number = 50, cursor?: string) {
     const notifications = await prisma.notification.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
-      take: limit,
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
 
-    return notifications;
+    const nextCursor = notifications.length > limit ? notifications.pop()?.id : undefined;
+    return { items: notifications, nextCursor };
   }
 
   async getUnreadCount(userId: string) {
@@ -45,6 +60,7 @@ export class NotificationService {
       data: { read: true },
     });
 
+    emitToUser(userId, "notifications_read", { all: true });
     return { message: "All notifications marked as read" };
   }
 
@@ -68,7 +84,8 @@ export class NotificationService {
     userId: string,
     type: string,
     title: string,
-    body: string
+    body: string,
+    metadata?: any
   ) {
     const notification = await prisma.notification.create({
       data: {
@@ -76,75 +93,113 @@ export class NotificationService {
         type,
         title,
         body,
+        metadata: metadata ? JSON.stringify(metadata) : null,
       },
     });
+
+    // Emit real-time notification via socket
+    emitToUser(userId, "new_notification", notification);
+    
+    // Also emit unread count update
+    const unreadCount = await this.getUnreadCount(userId);
+    emitToUser(userId, "unread_count", { count: unreadCount });
 
     return notification;
   }
 
-  async notifyNewMatch(user1Id: string, user2Id: string, matchId: string) {
-    const user1 = await prisma.user.findUnique({
-      where: { id: user1Id },
-      select: { username: true },
-    });
-
-    const user2 = await prisma.user.findUnique({
-      where: { id: user2Id },
-      select: { username: true },
-    });
-
-    await Promise.all([
-      this.createNotification(
-        user1Id,
-        "NEW_MATCH",
-        "New Match!",
-        `You matched with ${user2?.username}`
-      ),
-      this.createNotification(
-        user2Id,
-        "NEW_MATCH",
-        "New Match!",
-        `You matched with ${user1?.username}`
-      ),
-    ]);
-  }
-
-  async notifyNewMessage(receiverId: string, senderUsername: string) {
-    await this.createNotification(
-      receiverId,
-      "NEW_MESSAGE",
-      "New Message",
-      `${senderUsername} sent you a message`
-    );
-  }
-
-  async notifyGiftReceived(receiverId: string, senderUsername: string, giftName: string) {
-    await this.createNotification(
-      receiverId,
-      "GIFT_RECEIVED",
-      "Gift Received!",
-      `${senderUsername} sent you ${giftName}`
-    );
-  }
-
-  async notifyLiveStarted(hostId: string, title: string) {
-    // Notify all followers that user is live
-    // In a real app, fetch followers from a Follower model
-    await this.createNotification(
-      hostId,
-      "LIVE_STARTED",
-      "Stream Started",
-      `Your stream "${title}" is now live`
-    );
-  }
-
-  async notifyWithdrawalStatus(userId: string, status: string) {
-    const statusText = status === "COMPLETED" ? "approved" : "pending";
-    await this.createNotification(
+  async notifyFollow(userId: string, followerUsername: string, followerId: string) {
+    return this.createNotification(
       userId,
-      "WITHDRAWAL_STATUS",
+      "follow",
+      "New Follower",
+      `${followerUsername} started following you`,
+      { followerId, followerUsername }
+    );
+  }
+
+  async notifyLike(userId: string, likerUsername: string, postId: string) {
+    return this.createNotification(
+      userId,
+      "like",
+      "New Like",
+      `${likerUsername} liked your post`,
+      { postId, likerUsername }
+    );
+  }
+
+  async notifyComment(userId: string, commenterUsername: string, postId: string, commentContent: string) {
+    return this.createNotification(
+      userId,
+      "comment",
+      "New Comment",
+      `${commenterUsername} commented: "${commentContent.substring(0, 50)}"`,
+      { postId, commenterUsername, commentContent }
+    );
+  }
+
+  async notifyNewMessage(receiverId: string, senderUsername: string, conversationId: string) {
+    return this.createNotification(
+      receiverId,
+      "message",
+      "New Message",
+      `${senderUsername} sent you a message`,
+      { conversationId, senderUsername }
+    );
+  }
+
+  async notifyGiftReceived(receiverId: string, senderUsername: string, giftName: string, amount: number) {
+    return this.createNotification(
+      receiverId,
+      "gift",
+      "Gift Received! 🎁",
+      `${senderUsername} sent you ${giftName} worth ${amount} coins`,
+      { senderUsername, giftName, amount }
+    );
+  }
+
+  async notifyLiveStarted(followers: string[], hostUsername: string, streamId: string, title: string) {
+    const notifications = await Promise.all(
+      followers.map(followerId =>
+        this.createNotification(
+          followerId,
+          "live",
+          "🔴 Live Now",
+          `${hostUsername} is live: "${title}"`,
+          { streamId, hostUsername, title }
+        )
+      )
+    );
+    return notifications;
+  }
+
+  async notifyStreamEnded(hostId: string, streamTitle: string) {
+    return this.createNotification(
+      hostId,
+      "system",
+      "Stream Ended",
+      `Your stream "${streamTitle}" has ended. Check your analytics for details.`,
+      { streamTitle }
+    );
+  }
+
+  async notifyWithdrawalStatus(userId: string, status: string, amount: number) {
+    const statusText = status === "COMPLETED" ? "approved" : status === "REJECTED" ? "rejected" : "pending";
+    return this.createNotification(
+      userId,
+      "wallet",
       "Withdrawal Update",
-      `Your withdrawal request has been ${statusText}`
+      `Your withdrawal of $${amount} has been ${statusText}`,
+      { status, amount }
+    );
+  }
+
+  async notifyMilestone(userId: string, milestone: string, value: number) {
+    return this.createNotification(
+      userId,
+      "system",
+      "🏆 Milestone Reached",
+      `Congratulations! You've reached ${value} ${milestone}`,
+      { milestone, value }
     );
   }
 }

@@ -1,103 +1,261 @@
-@import "tailwindcss";
-
-@theme {
-  --color-spark-red: #ff3366;
-  --color-spark-pink: #ff007f;
-  --color-spark-purple: #7a00cc;
-  --color-spark-teal: #00d8ff;
-  --color-spark-dark: #0f0f13;
-  --color-spark-gray: #18181f;
-  --color-spark-light: #f5f5f7;
-  
-  --animate-float: float 3s ease-in-out infinite;
-  --animate-pulse-glow: pulseGlow 2s ease-in-out infinite;
-  --animate-fade-in: fadeIn 0.5s ease-out forwards;
-  --animate-bounce-dot: bounceDot 1s infinite;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @layer base {
   :root {
-    --background: #0f0f13;
+    --background: #07070d;
     --foreground: #f5f5f7;
-  }
-
-  html {
-    scroll-behavior: smooth;
-  }
-
-  body {
-    min-height: 100vh;
-    margin: 0;
-    background: radial-gradient(circle at top, rgba(122, 0, 204, 0.14), transparent 18%),
-      radial-gradient(circle at 80% 15%, rgba(255, 0, 127, 0.12), transparent 18%),
-      radial-gradient(circle at 50% 70%, rgba(0, 216, 255, 0.08), transparent 18%),
-      var(--background);
-    color: var(--foreground);
-    font-family: 'Inter', system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    overflow-x: hidden;
+    --card: rgba(255, 255, 255, 0.03);
+    --card-hover: rgba(255, 255, 255, 0.06);
+    --border: rgba(255, 255, 255, 0.08);
+    --border-hover: rgba(255, 255, 255, 0.12);
+    --spark-pink: #ff007f;
+    --spark-purple: #7c3aed;
+    --spark-cyan: #06f7ff;
+    --spark-blue: #3b82f6;
+    --radius: 24px;
   }
 }
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================================
+   PREMIUM UTILITIES
+   ============================================================================ */
 
 @layer utilities {
-  .glass {
-    background: rgba(18, 18, 28, 0.55);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-  }
-
-  .glass-soft {
-    background: rgba(255, 255, 255, 0.04);
-    backdrop-filter: blur(22px);
-    -webkit-backdrop-filter: blur(22px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-  }
-
   .text-gradient {
-    background: linear-gradient(120deg, var(--color-spark-red), var(--color-spark-pink), var(--color-spark-purple));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400;
   }
 
-  .bg-gradient-spark {
-    background: linear-gradient(135deg, var(--color-spark-red) 0%, var(--color-spark-pink) 45%, var(--color-spark-purple) 100%);
+  .text-gradient-primary {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-[#ff007f] to-[#7c3aed];
   }
 
-  .text-glow {
-    text-shadow: 0 0 16px rgba(255, 0, 127, 0.35);
+  .text-gradient-cyan {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500;
   }
 
-  .shadow-glow {
-    box-shadow: 0 0 60px rgba(255, 0, 127, 0.18);
+  .glass {
+    @apply bg-white/[0.03] backdrop-blur-2xl border border-white/[0.06] shadow-xl;
   }
 
-  .card-highlight {
-    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-    border: 1px solid rgba(255,255,255,0.08);
+  .glass-strong {
+    @apply bg-white/[0.06] backdrop-blur-2xl border border-white/[0.08] shadow-2xl;
+  }
+
+  .glass-card {
+    @apply bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-[24px] shadow-lg;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .glass-card:hover {
+    @apply bg-white/[0.06] border-white/[0.1];
+    box-shadow: 0 8px 40px rgba(255, 0, 127, 0.08);
+  }
+
+  .glow-pink {
+    box-shadow: 0 0 30px rgba(255, 0, 127, 0.15), 0 0 60px rgba(255, 0, 127, 0.05);
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 30px rgba(124, 58, 237, 0.15), 0 0 60px rgba(124, 58, 237, 0.05);
+  }
+
+  .glow-cyan {
+    box-shadow: 0 0 30px rgba(6, 247, 255, 0.15), 0 0 60px rgba(6, 247, 255, 0.05);
+  }
+
+  .glow-text-pink {
+    text-shadow: 0 0 20px rgba(255, 0, 127, 0.3), 0 0 40px rgba(255, 0, 127, 0.1);
+  }
+
+  .bg-grid {
+    background-image: 
+      linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  .bg-radial-gradient {
+    background: radial-gradient(ellipse at 50% 0%, rgba(124, 58, 237, 0.15) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 20%, rgba(255, 0, 127, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 20% 80%, rgba(6, 247, 255, 0.05) 0%, transparent 50%);
+  }
+
+  .bg-aurora {
+    background: 
+      radial-gradient(ellipse 100% 50% at 50% 0%, rgba(124, 58, 237, 0.3) 0%, transparent 70%),
+      radial-gradient(ellipse 80% 40% at 70% 30%, rgba(255, 0, 127, 0.2) 0%, transparent 70%),
+      radial-gradient(ellipse 60% 30% at 30% 20%, rgba(6, 247, 255, 0.15) 0%, transparent 70%);
+  }
+
+  .hover-lift {
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(255, 0, 127, 0.1);
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mask-fade-bottom {
+    mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
   }
 }
+
+/* ============================================================================
+   ANIMATIONS
+   ============================================================================ */
 
 @keyframes float {
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
-  100% { transform: translateY(0); }
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  25% { transform: translateY(-15px) rotate(1deg); }
+  75% { transform: translateY(8px) rotate(-0.5deg); }
 }
 
-@keyframes pulseGlow {
-  0% { box-shadow: 0 0 0 0 rgba(255, 51, 102, 0.35); }
-  70% { box-shadow: 0 0 0 18px rgba(255, 51, 102, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(255, 51, 102, 0); }
+@keyframes float-delayed {
+  0%, 100% { transform: translateY(0px); }
+  33% { transform: translateY(-20px); }
+  66% { transform: translateY(10px); }
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
+@keyframes aurora-shimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes bounceDot {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes orb-move {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(30px, -50px) scale(1.1); }
+  50% { transform: translate(-20px, 20px) scale(0.9); }
+  75% { transform: translate(40px, 30px) scale(1.05); }
+}
+
+.animate-float { animation: float 8s ease-in-out infinite; }
+.animate-float-delayed { animation: float-delayed 10s ease-in-out infinite; }
+.animate-aurora { animation: aurora-shimmer 8s ease infinite; background-size: 200% 200%; }
+.animate-pulse-glow { animation: pulse-glow 3s ease-in-out infinite; }
+.animate-spin-slow { animation: spin-slow 20s linear infinite; }
+.animate-shimmer { 
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 3s ease-in-out infinite;
+}
+.animate-orb { animation: orb-move 15s ease-in-out infinite; }
+
+/* ============================================================================
+   INPUT STYLES
+   ============================================================================ */
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="url"],
+input[type="number"],
+textarea,
+select {
+  @apply bg-white/[0.04] border border-white/[0.08] rounded-2xl text-white text-sm;
+  @apply placeholder:text-white/25 outline-none;
+  @apply transition-all duration-200 ease-out;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  @apply border-[#ff007f]/40 bg-white/[0.06];
+  box-shadow: 0 0 0 3px rgba(255, 0, 127, 0.08);
+}
+
+input[type="checkbox"] {
+  @apply rounded border-white/20 bg-white/[0.04];
+  accent-color: #ff007f;
+}
+
+input[type="checkbox"]:focus {
+  @apply ring-2 ring-[#ff007f]/30 ring-offset-2 ring-offset-transparent;
+}
+
+/* ============================================================================
+   CUSTOM SCROLLBAR
+   ============================================================================ */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================================================
+   SELECTION
+   ============================================================================ */
+
+::selection {
+  background: rgba(255, 0, 127, 0.3);
+  color: white;
+}
+
+/* ============================================================================
+   FOCUS VISIBLE
+   ============================================================================ */
+
+:focus-visible {
+  outline: 2px solid rgba(255, 0, 127, 0.5);
+  outline-offset: 2px;
+  border-radius: 8px;
 }

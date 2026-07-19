@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sparklive
+  labels:
+    name: sparklive
+    environment: production
+    tier: application
+    managed-by: terraform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sparklive-monitoring
+  labels:
+    name: sparklive-monitoring
+    environment: production
+    tier: monitoring
+    managed-by: terraform

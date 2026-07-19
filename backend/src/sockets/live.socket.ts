@@ -7,7 +7,10 @@ export const handleLiveSocket = (io: Server) => {
     const token = socket.handshake.auth.token;
     if (!token) return next(new Error('Authentication error'));
 
-    jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret', (err: any, decoded: any) => {
+    if (!process.env.JWT_SECRET) {
+      return next(new Error('Server configuration error'));
+    }
+    jwt.verify(token, process.env.JWT_SECRET, (err: any, decoded: any) => {
       if (err) return next(new Error('Authentication error'));
       socket.data.userId = decoded.userId;
       next();

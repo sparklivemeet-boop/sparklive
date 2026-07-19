@@ -1,0 +1,134 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: redis
+spec:
+  serviceName: redis
+  replicas: 3
+  selector:
+    matchLabels:
+      app: sparklive
+      component: redis
+  template:
+    metadata:
+      labels:
+        app: sparklive
+        component: redis
+    spec:
+      priorityClassName: sparklive-high
+      securityContext:
+        runAsUser: 999
+        fsGroup: 999
+        runAsNonRoot: true
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+              name: redis
+          command:
+            - /bin/sh
+            - -c
+            - |
+              redis-server \
+                --appendonly yes \
+                --requirepass ${REDIS_PASSWORD} \
+                --masterauth ${REDIS_PASSWORD} \
+                --maxmemory 2gb \
+                --maxmemory-policy allkeys-lru \
+                --save 900 1 \
+                --save 300 10 \
+                --save 60 10000
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sparklive-secrets
+                  key: REDIS_PASSWORD
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - --no-auth-warning
+                - -a
+                - $(REDIS_PASSWORD)
+                - ping
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - --no-auth-warning
+                - -a
+                - $(REDIS_PASSWORD)
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 2
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      nodeSelector:
+        type: stateful
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp3
+        resources:
+          requests:
+            storage: 100Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: redis
+spec:
+  ports:
+    - port: 6379
+      name: redis
+  clusterIP: None
+  selector:
+    app: sparklive
+    component: redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-read
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: redis
+spec:
+  ports:
+    - port: 6379
+      name: redis
+  selector:
+    app: sparklive
+    component: redis

@@ -1,0 +1,239 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: frontend
+spec:
+  selector:
+    app: sparklive
+    component: frontend
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+      name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-api
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: backend-api
+spec:
+  selector:
+    app: sparklive
+    component: backend-api
+  ports:
+    - port: 5000
+      targetPort: 5000
+      protocol: TCP
+      name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: websocket
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: websocket
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+spec:
+  selector:
+    app: sparklive
+    component: websocket
+  ports:
+    - port: 5001
+      targetPort: 5001
+      protocol: TCP
+      name: ws
+  type: ClusterIP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 86400
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: admin
+spec:
+  selector:
+    app: sparklive
+    component: admin
+  ports:
+    - port: 3001
+      targetPort: 3001
+      protocol: TCP
+      name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: worker
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: worker
+spec:
+  selector:
+    app: sparklive
+    component: worker
+  ports:
+    - port: 9090
+      targetPort: 9090
+      protocol: TCP
+      name: metrics
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-primary
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: postgres-primary
+spec:
+  selector:
+    app: sparklive
+    component: postgres-primary
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+      name: postgres
+  type: ClusterIP
+  clusterIP: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-replica
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: postgres-replica
+spec:
+  selector:
+    app: sparklive
+    component: postgres-replica
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+      name: postgres
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: redis
+spec:
+  selector:
+    app: sparklive
+    component: redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+      protocol: TCP
+      name: redis
+  type: ClusterIP
+  clusterIP: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-sentinel
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: redis-sentinel
+spec:
+  selector:
+    app: sparklive
+    component: redis-sentinel
+  ports:
+    - port: 26379
+      targetPort: 26379
+      protocol: TCP
+      name: sentinel
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: minio
+spec:
+  selector:
+    app: sparklive
+    component: minio
+  ports:
+    - port: 9000
+      targetPort: 9000
+      protocol: TCP
+      name: api
+    - port: 9001
+      targetPort: 9001
+      protocol: TCP
+      name: console
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: media-processor
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: media-processor
+spec:
+  selector:
+    app: sparklive
+    component: media-processor
+  ports:
+    - port: 5002
+      targetPort: 5002
+      protocol: TCP
+      name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-service
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: ai-service
+spec:
+  selector:
+    app: sparklive
+    component: ai-service
+  ports:
+    - port: 5003
+      targetPort: 5003
+      protocol: TCP
+      name: http
+  type: ClusterIP

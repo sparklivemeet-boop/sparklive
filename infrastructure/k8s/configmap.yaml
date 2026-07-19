@@ -1,0 +1,125 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sparklive-config
+  namespace: sparklive
+  labels:
+    app: sparklive
+    environment: production
+data:
+  # Application URLs
+  FRONTEND_URL: "https://sparklive.com"
+  API_URL: "https://api.sparklive.com"
+  WS_URL: "wss://ws.sparklive.com"
+  CDN_URL: "https://cdn.sparklive.com"
+  ADMIN_URL: "https://admin.sparklive.com"
+
+  # CORS Configuration
+  CORS_ORIGINS: "https://sparklive.com,https://admin.sparklive.com,https://app.sparklive.com"
+  CORS_CREDENTIALS: "true"
+  CORS_MAX_AGE: "86400"
+
+  # Security
+  HSTS_MAX_AGE: "31536000"
+  HSTS_INCLUDE_SUBDOMAINS: "true"
+  HSTS_PRELOAD: "true"
+  CSP_DEFAULT_SRC: "'self'"
+  CSP_SCRIPT_SRC: "'self' 'unsafe-inline' 'unsafe-eval'"
+  CSP_STYLE_SRC: "'self' 'unsafe-inline'"
+  CSP_IMG_SRC: "'self' data: https: blob:"
+  CSP_CONNECT_SRC: "'self' https: wss:"
+  CSP_FONT_SRC: "'self' data:"
+  CSP_MEDIA_SRC: "'self' https: blob:"
+  CSP_FRAME_SRC: "'self'"
+  CSP_WORKER_SRC: "'self' blob:"
+
+  # Rate Limiting
+  RATE_LIMIT_WINDOW_MS: "60000"
+  RATE_LIMIT_MAX: "100"
+  RATE_LIMIT_AUTH_MAX: "10"
+  RATE_LIMIT_UPLOAD_MAX: "5"
+  RATE_LIMIT_SEARCH_MAX: "30"
+  RATE_LIMIT_MESSAGING_MAX: "60"
+
+  # Database
+  DB_HOST: "postgres-primary"
+  DB_PORT: "5432"
+  DB_NAME: "sparklive"
+  DB_USER: "sparkuser"
+  DB_REPLICA_HOST: "postgres-replica"
+  DB_REPLICA_PORT: "5432"
+  DB_POOL_MIN: "5"
+  DB_POOL_MAX: "50"
+  DB_IDLE_TIMEOUT: "30000"
+  DB_CONNECTION_TIMEOUT: "10000"
+
+  # Redis
+  REDIS_HOST: "redis-master-0"
+  REDIS_PORT: "6379"
+  REDIS_SENTINEL_HOSTS: "redis-sentinel:26379"
+  REDIS_DB_SESSION: "0"
+  REDIS_DB_CACHE: "1"
+  REDIS_DB_QUEUE: "2"
+  REDIS_DB_PUBSUB: "3"
+  REDIS_DB_RATELIMIT: "4"
+
+  # S3/Object Storage
+  S3_ENDPOINT: "http://minio:9000"
+  S3_REGION: "us-east-1"
+  S3_BUCKET_MEDIA: "sparklive-media"
+  S3_BUCKET_BACKUPS: "sparklive-backups"
+  S3_BUCKET_LOGS: "sparklive-logs"
+  S3_BUCKET_STATIC: "sparklive-static"
+  S3_SSL_ENABLED: "false"
+  S3_FORCE_PATH_STYLE: "true"
+
+  # WebSocket
+  WS_MAX_CONNECTIONS: "10000"
+  WS_PING_TIMEOUT: "60000"
+  WS_PING_INTERVAL: "25000"
+  WS_MAX_BUFFER_SIZE: "1048576"
+
+  # Media Processing
+  MEDIA_MAX_FILE_SIZE: "104857600"
+  IMAGE_QUALITY: "80"
+  VIDEO_BITRATE: "2M"
+  VIDEO_MAX_DURATION: "300"
+  THUMBNAIL_WIDTH: "480"
+  THUMBNAIL_HEIGHT: "270"
+  ALLOWED_IMAGE_TYPES: "image/jpeg,image/png,image/webp,image/gif"
+  ALLOWED_VIDEO_TYPES: "video/mp4,video/webm,video/ogg"
+
+  # Live Streaming
+  LIVE_MAX_DURATION: "14400"
+  LIVE_SEGMENT_DURATION: "4"
+  LIVE_PLAYLIST_SIZE: "10"
+  LIVE_ADAPTIVE_BITRATES: "1080p,720p,480p,360p"
+
+  # Caching
+  CACHE_TTL_DEFAULT: "300"
+  CACHE_TTL_TRENDING: "300"
+  CACHE_TTL_USER: "60"
+  CACHE_TTL_PROFILE: "120"
+  CACHE_TTL_FEED: "180"
+  CACHE_TTL_SEARCH: "120"
+  CACHE_WARM_INTERVAL: "300000"
+
+  # Monitoring
+  METRICS_ENABLED: "true"
+  METRICS_PREFIX: "sparklive"
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+  TRACING_ENABLED: "true"
+  TRACING_SAMPLE_RATE: "0.1"
+
+  # Feature Flags
+  FEATURE_NEW_FEED: "true"
+  FEATURE_LIVE_STREAMING: "true"
+  FEATURE_GIFTS: "true"
+  FEATURE_STORIES: "true"
+  FEATURE_MATCHES: "true"
+  FEATURE_GROUPS: "true"
+  FEATURE_COMMUNITIES: "true"
+  FEATURE_MONETIZATION: "true"
+  FEATURE_2FA: "true"
+  FEATURE_AUDIT_LOG: "true"

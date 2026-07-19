@@ -1,0 +1,55 @@
+# =============================================================================
+# SparkLive Admin Dashboard - Production Docker Image
+# Multi-stage build for Next.js admin panel
+# =============================================================================
+
+FROM node:20-alpine AS deps
+LABEL stage=sparklive-admin-deps
+
+RUN apk add --no-cache libc6-compat
+
+WORKDIR /app
+
+COPY admin/package.json admin/package-lock.json* ./
+RUN npm ci --only=production --ignore-scripts && \
+    npm cache clean --force
+
+FROM node:20-alpine AS builder
+LABEL stage=sparklive-admin-builder
+
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY admin/ .
+
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
+RUN npm run build
+
+FROM node:20-alpine AS runner
+LABEL stage=sparklive-admin-production
+LABEL maintainer="SparkLive DevOps"
+LABEL description="SparkLive Admin Dashboard"
+
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+WORKDIR /app
+
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+USER nextjs
+
+EXPOSE 3001
+
+ENV PORT=3001
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
+
+CMD ["node", "server.js"]

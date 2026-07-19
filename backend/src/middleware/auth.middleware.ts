@@ -20,7 +20,11 @@ export const authenticateJWT = async (req: AuthRequest, res: Response, next: Nex
 
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+    if (!process.env.JWT_SECRET) {
+      res.status(500).json({ error: 'Server configuration error: JWT_SECRET not set' });
+      return;
+    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const decodedPayload = decoded as { userId?: string; role?: string };
 
     if (!decodedPayload || !decodedPayload.userId) {

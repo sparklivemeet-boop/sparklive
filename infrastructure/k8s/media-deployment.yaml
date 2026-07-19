@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: media-processor
+  namespace: sparklive
+  labels:
+    app: sparklive
+    component: media-processor
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: sparklive
+      component: media-processor
+  template:
+    metadata:
+      labels:
+        app: sparklive
+        component: media-processor
+    spec:
+      priorityClassName: sparklive-medium
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      containers:
+        - name: media-processor
+          image: ${REGISTRY}/sparklive-media:${IMAGE_TAG}
+          ports:
+            - containerPort: 5002
+              name: http
+          envFrom:
+            - secretRef:
+                name: sparklive-secrets
+            - configMapRef:
+                name: sparklive-config
+          resources:
+            requests:
+              cpu: "2"
+              memory: "2Gi"
+            limits:
+              cpu: "4"
+              memory: "4Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5002
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5002
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      nodeSelector:
+        type: application
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: media-processor-hpa
+  namespace: sparklive
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: media-processor
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+    - type: Pods
+      pods:
+        metric:
+          name: media_queue_depth
+        target:
+          type: AverageValue
+          averageValue: "50"
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: media-processor-pdb
+  namespace: sparklive
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: sparklive
+      component: media-processor

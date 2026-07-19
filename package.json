@@ -13,6 +13,9 @@
     "install:all": "npm install && npm --prefix frontend install && npm --prefix backend install",
     "clean": "rm -rf node_modules frontend/node_modules backend/node_modules package-lock.json frontend/package-lock.json backend/package-lock.json"
   },
+  "dependencies": {
+    "next": "^14.2.15"
+  },
   "devDependencies": {
     "@types/body-parser": "^1.19.6",
     "@types/http-errors": "^2.0.5",

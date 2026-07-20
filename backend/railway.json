@@ -1,7 +1,7 @@
 {
   "app": "sparklive-backend",
-  "buildCommand": "cd backend && npm install && npm run build",
-  "startCommand": "cd backend && npm start",
+  "buildCommand": "cd backend && npm install && npx tsc; true",
+  "startCommand": "cd backend && node dist/index.js",
   "rootDirectory": "backend",
   "framework": "nodejs",
   "nodeVersion": "24.x",

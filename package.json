@@ -1,6 +1,8 @@
 {
   "private": true,
+  "main": "backend/src/server.js",
   "scripts": {
+    "start": "cd backend && node dist/index.js",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "build:backend": "npm --prefix backend run build",

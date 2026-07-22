@@ -10,6 +10,7 @@ import type { Locale } from './config';
 import { defaultLocale } from './config';
 import { detectLocale, storeLocale, detectTimezone, storeTimezone } from './locale-detection';
 import type { TranslationKeys } from './types';
+import enDefaultTranslations from './translations/en.json';
 
 type TranslationValue = string | { [key: string]: TranslationValue };
 
@@ -33,8 +34,10 @@ interface I18nContextType {
 
 const I18nContext = createContext<I18nContextType | null>(null);
 
-// Cache loaded translations
+// Cache loaded translations (used for dynamic imports beyond default locale)
 const translationCache = new Map<string, TranslationKeys>();
+// Pre-populate cache with default locale so SSR and first client render match
+translationCache.set('en', enDefaultTranslations as unknown as TranslationKeys);
 
 function resolveNestedValue(obj: TranslationKeys | TranslationValue, path: string): string | null {
   const keys = path.split('.');
@@ -64,7 +67,8 @@ function interpolateTemplate(template: string, params?: Record<string, string | 
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(defaultLocale);
-  const [translations, setTranslations] = useState<TranslationKeys | null>(null);
+  // Initialize with pre-loaded English translations so SSR and first client render match
+  const [translations, setTranslations] = useState<TranslationKeys>(enDefaultTranslations as unknown as TranslationKeys);
   const [isLoading, setIsLoading] = useState(true);
   const [timezone, setTimezone] = useState('UTC');
   const mountedRef = useRef(true);
@@ -103,7 +107,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       setTranslations(translations);
       setLocaleState(newLocale);
       storeLocale(newLocale);
-      // Update html attributes
+      // Update html attributes — only runs on client after hydration, safe here
       document.documentElement.lang = newLocale;
       document.documentElement.dir = newLocale === 'ar' || newLocale === 'ur' ? 'rtl' : 'ltr';
       setIsLoading(false);

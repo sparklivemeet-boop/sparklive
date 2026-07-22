@@ -12,6 +12,7 @@
     "clean": "rm -rf node_modules frontend/node_modules backend/node_modules package-lock.json frontend/package-lock.json backend/package-lock.json"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "next": "^14.2.15"
   },
   "devDependencies": {

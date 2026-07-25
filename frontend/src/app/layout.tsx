@@ -11,6 +11,7 @@ import { CANONICAL_DOMAIN, generateHreflangHtml } from "@/lib/i18n/seo";
 import { ContentCreationProvider } from "@/components/create/ContentCreationContext";
 import { cookies } from "next/headers";
 import AnalyticsWrapper from "@/components/AnalyticsWrapper";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -19,9 +20,13 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "SparkLive | Where Every Connection Glows",
+  metadataBase: new URL('https://sparkliveapp.xyz'),
+  title: {
+    default: "SparkLive | Where Every Connection Glows",
+    template: "%s | SparkLive",
+  },
   description:
-    "Discover people, swipe through profiles, follow creators, chat, join live streams, watch short videos, receive notifications, build communities, earn rewards, and manage your profile and wallet.",
+    "Premium social streaming platform. Go live, build communities, and earn rewards. Connect with creators and viewers worldwide.",
   keywords: [
     "social streaming",
     "live streaming",
@@ -30,6 +35,15 @@ export const metadata: Metadata = {
     "premium social",
     "sparklive",
   ],
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/icon-app.svg", sizes: "512x512", type: "image/svg+xml" },
+    ],
+  },
   openGraph: {
     title: "SparkLive | Where Every Connection Glows",
     description:
@@ -37,35 +51,39 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "SparkLive",
     locale: "en_US",
-    alternateLocale: ["fr_FR", "es_ES", "pt_BR", "ar_SA", "de_DE", "it_IT", "tr_TR", "ru_RU", "hi_IN", "ur_PK", "bn_BD", "id_ID", "vi_VN", "th_TH", "zh_CN", "zh_TW", "ja_JP", "ko_KR"],
+    images: [
+      { url: "/logo.svg", width: 512, height: 512, alt: "SparkLive" },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "SparkLive | Where Every Connection Glows",
+    description: "Premium social streaming, creator, and discovery platform.",
+    images: ["/logo.svg"],
   },
   alternates: {
-    canonical: CANONICAL_DOMAIN,
+    canonical: "https://sparkliveapp.xyz",
     languages: {
-      "en": `${CANONICAL_DOMAIN}`,
-      "fr": `${CANONICAL_DOMAIN}/fr`,
-      "es": `${CANONICAL_DOMAIN}/es`,
-      "pt": `${CANONICAL_DOMAIN}/pt`,
-      "ar": `${CANONICAL_DOMAIN}/ar`,
-      "de": `${CANONICAL_DOMAIN}/de`,
-      "it": `${CANONICAL_DOMAIN}/it`,
-      "tr": `${CANONICAL_DOMAIN}/tr`,
-      "ru": `${CANONICAL_DOMAIN}/ru`,
-      "hi": `${CANONICAL_DOMAIN}/hi`,
-      "ur": `${CANONICAL_DOMAIN}/ur`,
-      "bn": `${CANONICAL_DOMAIN}/bn`,
-      "id": `${CANONICAL_DOMAIN}/id`,
-      "vi": `${CANONICAL_DOMAIN}/vi`,
-      "th": `${CANONICAL_DOMAIN}/th`,
-      "zh-Hans": `${CANONICAL_DOMAIN}/zh`,
-      "zh-Hant": `${CANONICAL_DOMAIN}/zh-TW`,
-      "ja": `${CANONICAL_DOMAIN}/ja`,
-      "ko": `${CANONICAL_DOMAIN}/ko`,
-      "x-default": `${CANONICAL_DOMAIN}`,
+      'en': 'https://sparkliveapp.xyz',
+      'fr': 'https://sparkliveapp.xyz/fr',
+      'es': 'https://sparkliveapp.xyz/es',
+      'pt': 'https://sparkliveapp.xyz/pt',
+      'ar': 'https://sparkliveapp.xyz/ar',
+      'de': 'https://sparkliveapp.xyz/de',
+      'it': 'https://sparkliveapp.xyz/it',
+      'tr': 'https://sparkliveapp.xyz/tr',
+      'ru': 'https://sparkliveapp.xyz/ru',
+      'hi': 'https://sparkliveapp.xyz/hi',
+      'ur': 'https://sparkliveapp.xyz/ur',
+      'bn': 'https://sparkliveapp.xyz/bn',
+      'id': 'https://sparkliveapp.xyz/id',
+      'vi': 'https://sparkliveapp.xyz/vi',
+      'th': 'https://sparkliveapp.xyz/th',
+      'zh-Hans': 'https://sparkliveapp.xyz/zh',
+      'zh-Hant': 'https://sparkliveapp.xyz/zh-TW',
+      'ja': 'https://sparkliveapp.xyz/ja',
+      'ko': 'https://sparkliveapp.xyz/ko',
     },
-  },
-  other: {
-    "theme-color": "#0a0a0a",
   },
 };
 
@@ -115,8 +133,6 @@ export default async function RootLayout({
           />
         </noscript>
 
-        {/* SEO hreflang tags */}
-        {generateHreflangHtml('')}
         
         {/* JSON-LD Structured Data */}
         <script
@@ -148,7 +164,9 @@ export default async function RootLayout({
                 <ToastProvider>
                   <ContentCreationProvider>
                     <div id="main-content" tabIndex={-1}>
-                      <AppLayout>{children}</AppLayout>
+                      <ErrorBoundary>
+                        <AppLayout>{children}</AppLayout>
+                      </ErrorBoundary>
                     </div>
                   </ContentCreationProvider>
                 </ToastProvider>

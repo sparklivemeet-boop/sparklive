@@ -1,11 +1,88 @@
 import { PrismaClient } from '@prisma/client';
+import argon2 from 'argon2';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Seeding SparkLive monetization data...');
 
+  // ============================================================================
+  // 0. CREATE ADMINISTRATOR ACCOUNT (if not exists)
+  // ============================================================================
+  const adminEmail = 'sparklivemeet@gmail.com';
+  const adminUsername = 'CEO';
+  const adminPassword = '2388562Ceo$';
+
+  const existingAdmin = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: adminEmail },
+        { username: adminUsername },
+      ],
+    },
+  });
+
+  if (existingAdmin) {
+    // Update missing fields if necessary
+    const updates: any = {};
+    if (existingAdmin.role !== 'ADMIN') updates.role = 'ADMIN';
+    if (!existingAdmin.verified) updates.verified = true;
+    if (!existingAdmin.emailVerified) updates.emailVerified = true;
+
+    if (Object.keys(updates).length > 0) {
+      await prisma.user.update({
+        where: { id: existingAdmin.id },
+        data: updates,
+      });
+      console.log('✅ Administrator account updated with missing fields');
+    } else {
+      console.log('✅ Administrator account already exists and is up-to-date');
+    }
+  } else {
+    // Hash password using Argon2id (same as CryptoUtils.hashPassword)
+    const passwordHash = await argon2.hash(adminPassword, {
+      type: argon2.argon2id,
+      memoryCost: 65536,   // 64MB
+      timeCost: 3,         // 3 iterations
+      parallelism: 4,      // 4 threads
+      hashLength: 32,
+    });
+
+    // Create admin user with all required fields
+    const admin = await prisma.user.create({
+      data: {
+        email: adminEmail,
+        username: adminUsername,
+        passwordHash,
+        fullName: 'CEO',
+        role: 'ADMIN',
+        verified: true,
+        emailVerified: true,
+        status: 'ACTIVE',
+        profile: {
+          create: {
+            username: adminUsername,
+            fullName: 'CEO',
+          },
+        },
+        wallet: {
+          create: {},
+        },
+        userSettings: {
+          create: {},
+        },
+        notificationPrefs: {
+          create: {},
+        },
+      },
+    });
+
+    console.log(`✅ Administrator account created: ${admin.email} (${admin.username})`);
+  }
+
+  // ============================================================================
   // 1. Create SparkCoin Packages
+  // ============================================================================
   const packages = [
     { name: 'Starter Pack', coins: 100, price: 0.99, bonusCoins: 0, isPopular: false, sortOrder: 1 },
     { name: 'Popular Pack', coins: 550, price: 4.99, bonusCoins: 50, isPopular: true, sortOrder: 2 },
@@ -24,7 +101,9 @@ async function main() {
   }
   console.log('✅ SparkCoin packages created');
 
+  // ============================================================================
   // 2. Create Gifts
+  // ============================================================================
   const everydayGifts = [
     { name: 'Heart', price: 10, emoji: '❤️', category: 'everyday', glowColor: '#ff3366', particleColor: '#ff3366', sortOrder: 1, description: 'Show someone you care', animationUrl: '/animations/gifts/heart.json', soundEffect: 'gift-heart.mp3', animationDuration: 2 },
     { name: 'Rose', price: 25, emoji: '🌹', category: 'everyday', glowColor: '#ff0000', particleColor: '#ff0000', sortOrder: 2, description: 'A classic romantic gesture', animationUrl: '/animations/gifts/rose.json', soundEffect: 'gift-rose.mp3', animationDuration: 2 },
@@ -86,7 +165,9 @@ async function main() {
   }
   console.log(`✅ ${allGifts.length} gifts created`);
 
+  // ============================================================================
   // 3. Create Premium Plans
+  // ============================================================================
   const premiumPlans = [
     { name: 'Monthly Spark', slug: 'monthly', description: 'Premium monthly membership', price: 9.99, interval: 'MONTHLY', coins: 500, isPopular: false, features: JSON.stringify(['Ad-free experience', 'Animated profile frame', 'Premium badge', 'Exclusive themes', 'Higher upload limits']), sortOrder: 1 },
     { name: 'Yearly Spark', slug: 'yearly', description: 'Premium yearly membership - best value', price: 89.99, interval: 'YEARLY', coins: 6000, isPopular: true, features: JSON.stringify(['All Monthly features', '2 months free', 'Advanced creator analytics', 'Early feature access', 'Premium stickers & emojis', 'Priority support']), sortOrder: 2 },

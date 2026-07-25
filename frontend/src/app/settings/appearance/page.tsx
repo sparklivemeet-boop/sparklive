@@ -1,54 +1,56 @@
-'use client';
+"use client";
 
 import { useState } from 'react';
-import { ArrowLeft, Palette, Save, Moon, Sun } from 'lucide-react';
-import Button from '@/components/ui/Button';
+import { ArrowLeft, Palette, Monitor, Sun, Moon } from 'lucide-react';
 import Link from 'next/link';
 
-export default function AppearanceSettingsPage() {
+export default function AppearanceSettings() {
   const [theme, setTheme] = useState('dark');
-  const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const { useAuth } = await import('@/context/AuthContext');
-      const { apiPut } = await import('@/lib/apiClient');
-      // Theme is saved via user settings
-      setSuccess('Appearance settings saved');
-      setTimeout(() => setSuccess(null), 3000);
-    } catch {}
-    setSaving(false);
-  };
 
   return (
-    <div className="min-h-screen pb-24 lg:pb-10">
-      <div className="max-w-2xl mx-auto space-y-6 p-6">
-        <div className="flex items-center gap-4">
-          <Link href="/settings"><Button variant="ghost" size="sm" icon={<ArrowLeft size={16} />}>Back</Button></Link>
-          <div>
-            <h1 className="text-2xl font-bold text-white">Appearance</h1>
-            <p className="text-sm text-gray-400">Customize your theme and display preferences.</p>
+    <div className="space-y-6 pb-6 max-w-2xl">
+      <Link href="/settings" className="inline-flex items-center gap-2 text-sm text-white/40 hover:text-white/60 transition-colors">
+        <ArrowLeft size={14} /> Back to Settings
+      </Link>
+      <h1 className="text-2xl font-bold text-white">Appearance</h1>
+
+      <div className="glass rounded-[var(--radius-2xl)] p-6 space-y-6">
+        <div>
+          <h2 className="text-sm font-semibold text-white mb-4">Theme</h2>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { id: 'dark', icon: Moon, label: 'Dark' },
+              { id: 'light', icon: Sun, label: 'Light' },
+              { id: 'system', icon: Monitor, label: 'System' },
+            ].map((option) => (
+              <button
+                key={option.id}
+                onClick={() => setTheme(option.id)}
+                className={`flex flex-col items-center gap-2 rounded-2xl p-4 border transition-all ${
+                  theme === option.id
+                    ? 'border-pink-500/30 bg-pink-500/10'
+                    : 'border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06]'
+                }`}
+              >
+                <option.icon size={20} className={theme === option.id ? 'text-pink-400' : 'text-white/40'} />
+                <span className="text-xs font-medium text-white">{option.label}</span>
+              </button>
+            ))}
           </div>
         </div>
-        {success && <div className="bg-emerald-500/10 border border-emerald-500/40 text-emerald-300 text-sm p-4 rounded-2xl">{success}</div>}
 
-        <div className="glass rounded-[28px] p-6 shadow-card space-y-5">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-semibold">Theme</p>
-          <div className="grid grid-cols-2 gap-4">
-            <button onClick={() => setTheme('dark')} className={`rounded-2xl border p-6 text-center transition ${theme === 'dark' ? 'border-[var(--color-spark-pink)] bg-white/10' : 'border-white/10 bg-black/40 hover:bg-white/5'}`}>
-              <Moon size={28} className="mx-auto mb-2 text-gray-300" />
-              <p className="text-sm font-medium text-white">Dark</p>
-              <p className="text-xs text-gray-500 mt-1">Easy on the eyes</p>
-            </button>
-            <button onClick={() => setTheme('light')} className={`rounded-2xl border p-6 text-center transition ${theme === 'light' ? 'border-[var(--color-spark-pink)] bg-white/10' : 'border-white/10 bg-black/40 hover:bg-white/5'}`}>
-              <Sun size={28} className="mx-auto mb-2 text-yellow-400" />
-              <p className="text-sm font-medium text-white">Light</p>
-              <p className="text-xs text-gray-500 mt-1">Bright and clean</p>
-            </button>
+        <div className="divider" />
+
+        <div>
+          <h2 className="text-sm font-semibold text-white mb-4">Layout Density</h2>
+          <div className="space-y-2">
+            {['Comfortable', 'Compact', 'Cozy'].map((option) => (
+              <label key={option} className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/[0.03] cursor-pointer">
+                <input type="radio" name="density" className="accent-pink-500" />
+                <span className="text-sm text-white/70">{option}</span>
+              </label>
+            ))}
           </div>
-          <Button variant="primary" onClick={handleSave} loading={saving} icon={<Save size={14} />}>Save preference</Button>
         </div>
       </div>
     </div>

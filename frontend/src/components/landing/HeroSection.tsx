@@ -3,16 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion, useMotionValue, useSpring } from "framer-motion";
 import Link from "next/link";
-import { Sparkles, Play, ArrowRight, Users, Radio, MessageCircle, Heart, Globe, Zap } from "lucide-react";
-
-const floatingCards = [
-  { icon: Users, label: "Live Streams", color: "from-pink-500 to-rose-600", x: 15, y: 20, delay: 0 },
-  { icon: MessageCircle, label: "Voice Rooms", color: "from-purple-500 to-violet-600", x: 80, y: 15, delay: 0.5 },
-  { icon: Radio, label: "AI Discovery", color: "from-cyan-500 to-blue-600", x: 10, y: 55, delay: 1 },
-  { icon: Heart, label: "Digital Gifts", color: "from-amber-500 to-orange-600", x: 85, y: 50, delay: 1.5 },
-  { icon: Globe, label: "Communities", color: "from-emerald-500 to-teal-600", x: 18, y: 75, delay: 2 },
-  { icon: Zap, label: "Creator Tools", color: "from-indigo-500 to-purple-600", x: 82, y: 78, delay: 2.5 },
-];
+import { Sparkles, Play, ArrowRight } from "lucide-react";
 
 export default function HeroSection() {
   const [mounted, setMounted] = useState(false);
@@ -38,31 +29,6 @@ export default function HeroSection() {
       <div className="absolute inset-0 bg-gradient-to-b from-purple-900/10 via-transparent to-transparent" />
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full bg-gradient-to-br from-pink-500/10 via-purple-500/10 to-cyan-500/5 blur-[120px] animate-pulse-glow" />
 
-      {/* Floating Cards - Desktop only */}
-      {mounted && floatingCards.map((card, i) => (
-        <motion.div
-          key={card.label}
-          initial={{ opacity: 0, scale: 0.8, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ delay: 0.5 + card.delay, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="hidden lg:flex absolute items-center gap-2.5 px-4 py-2.5 rounded-2xl glass-strong backdrop-blur-xl border border-white/[0.08] shadow-2xl"
-          style={{
-            left: `${card.x}%`,
-            top: `${card.y}%`,
-            transformStyle: "preserve-3d",
-          }}
-        >
-          <motion.div
-            animate={{ y: [0, -6, 0] }}
-            transition={{ duration: 4 + i * 0.5, repeat: Infinity, ease: "easeInOut" }}
-            className={`w-8 h-8 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center`}
-          >
-            <card.icon size={14} className="text-white" />
-          </motion.div>
-          <span className="text-sm font-medium text-white/80 whitespace-nowrap">{card.label}</span>
-        </motion.div>
-      ))}
-
       {/* Hero content */}
       <div className="relative z-10 max-w-6xl mx-auto text-center">
         {/* Badge */}
@@ -87,7 +53,7 @@ export default function HeroSection() {
         >
           <span className="text-white">Where Every</span>
           <br />
-          <span className="text-gradient-primary glow-text-pink">Connection</span>
+          <span className="text-gradient glow-text-pink">Connection</span>
           <br />
           <span className="text-white">Glows</span>
         </motion.h1>
@@ -125,26 +91,6 @@ export default function HeroSection() {
             </span>
             Watch Demo
           </button>
-        </motion.div>
-
-        {/* Stats row */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={mounted ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-16 flex flex-wrap items-center justify-center gap-8 sm:gap-16"
-        >
-          {[
-            { value: "10K+", label: "Active Users" },
-            { value: "50K+", label: "Live Streams" },
-            { value: "100K+", label: "Communities" },
-            { value: "1M+", label: "Messages Sent" },
-          ].map((stat) => (
-            <div key={stat.label} className="text-center">
-              <p className="text-2xl sm:text-3xl font-bold text-white glow-text-pink">{stat.value}</p>
-              <p className="text-xs text-white/40 mt-1 tracking-wide uppercase">{stat.label}</p>
-            </div>
-          ))}
         </motion.div>
       </div>
 

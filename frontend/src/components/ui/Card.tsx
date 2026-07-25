@@ -1,117 +1,105 @@
 'use client';
 
-import React, { forwardRef, type HTMLAttributes, type ReactNode } from 'react';
-
-export type CardVariant = 'glass' | 'strong' | 'highlight' | 'bordered' | 'neon';
-export type CardHover = 'lift' | 'glow' | 'none';
-export type CardPadding = 'none' | 'sm' | 'md' | 'lg';
+import React, { type ReactNode, type HTMLAttributes } from 'react';
+import { cn } from '@/lib/utils';
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
-  variant?: CardVariant;
-  hover?: CardHover;
-  padding?: CardPadding;
-  children?: ReactNode;
+  children: ReactNode;
+  variant?: 'default' | 'hover' | 'glass' | 'strong';
+  padding?: 'none' | 'sm' | 'md' | 'lg';
 }
 
-const variantStyles: Record<CardVariant, string> = {
-  glass: 'glass rounded-[28px]',
-  strong: 'glass-strong rounded-[28px]',
-  highlight: 'card-highlight rounded-[28px]',
-  bordered: 'border border-white/10 bg-transparent rounded-[28px]',
-  neon: 'glass rounded-[28px] neon-border',
+const variantStyles = {
+  default: 'glass-card',
+  hover: 'card-hover',
+  glass: 'glass rounded-[var(--radius-2xl)]',
+  strong: 'glass-strong rounded-[var(--radius-2xl)]',
 };
 
-const hoverStyles: Record<CardHover, string> = {
-  lift: 'hover-lift cursor-pointer',
-  glow: 'hover-glow cursor-pointer',
-  none: '',
-};
-
-const paddingStyles: Record<CardPadding, string> = {
+const paddingStyles = {
   none: 'p-0',
-  sm: 'p-4',
+  sm: 'p-3',
   md: 'p-5',
-  lg: 'p-6',
+  lg: 'p-6 sm:p-8',
 };
 
-export interface CardHeaderProps extends HTMLAttributes<HTMLDivElement> {
-  children?: ReactNode;
-}
-
-export const CardHeader = forwardRef<HTMLDivElement, CardHeaderProps>(
-  ({ children, className = '', ...props }, ref) => (
+export default function Card({
+  children,
+  variant = 'default',
+  padding = 'md',
+  className,
+  ...props
+}: CardProps) {
+  return (
     <div
-      ref={ref}
-      className={`flex items-center justify-between gap-4 mb-4 ${className}`}
+      className={cn(
+        variantStyles[variant],
+        paddingStyles[padding],
+        className
+      )}
       {...props}
     >
       {children}
     </div>
-  )
-);
-CardHeader.displayName = 'CardHeader';
-
-export interface CardBodyProps extends HTMLAttributes<HTMLDivElement> {
-  children?: ReactNode;
+  );
 }
 
-export const CardBody = forwardRef<HTMLDivElement, CardBodyProps>(
-  ({ children, className = '', ...props }, ref) => (
-    <div ref={ref} className={`space-y-3 ${className}`} {...props}>
+export function CardHeader({
+  children,
+  className,
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cn('flex items-center justify-between mb-4', className)} {...props}>
       {children}
     </div>
-  )
-);
-CardBody.displayName = 'CardBody';
-
-export interface CardFooterProps extends HTMLAttributes<HTMLDivElement> {
-  children?: ReactNode;
+  );
 }
 
-export const CardFooter = forwardRef<HTMLDivElement, CardFooterProps>(
-  ({ children, className = '', ...props }, ref) => (
-    <div
-      ref={ref}
-      className={`flex items-center justify-between gap-4 mt-4 pt-4 border-t border-white/10 ${className}`}
-      {...props}
-    >
+export function CardTitle({
+  children,
+  className,
+  ...props
+}: HTMLAttributes<HTMLHeadingElement>) {
+  return (
+    <h3 className={cn('text-lg font-semibold text-white', className)} {...props}>
+      {children}
+    </h3>
+  );
+}
+
+export function CardDescription({
+  children,
+  className,
+  ...props
+}: HTMLAttributes<HTMLParagraphElement>) {
+  return (
+    <p className={cn('text-sm text-white/40', className)} {...props}>
+      {children}
+    </p>
+  );
+}
+
+export function CardContent({
+  children,
+  className,
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cn('', className)} {...props}>
       {children}
     </div>
-  )
-);
-CardFooter.displayName = 'CardFooter';
+  );
+}
 
-const Card = forwardRef<HTMLDivElement, CardProps>(
-  (
-    {
-      variant = 'glass',
-      hover = 'none',
-      padding = 'md',
-      children,
-      className = '',
-      ...props
-    },
-    ref
-  ) => {
-    return (
-      <div
-        ref={ref}
-        className={`
-          animate-in
-          ${variantStyles[variant]}
-          ${hoverStyles[hover]}
-          ${paddingStyles[padding]}
-          shadow-card
-          ${className}
-        `}
-        {...props}
-      >
-        {children}
-      </div>
-    );
-  }
-);
-
-Card.displayName = 'Card';
-
-export default Card;
+export function CardFooter({
+  children,
+  className,
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cn('flex items-center gap-3 mt-4 pt-4 border-t border-white/[0.06]', className)} {...props}>
+      {children}
+    </div>
+  );
+}

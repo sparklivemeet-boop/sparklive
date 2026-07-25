@@ -1,17 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Globe, Users, MessageCircle, Sparkles, ArrowRight } from "lucide-react";
+import { Globe, ArrowRight } from "lucide-react";
 import Link from "next/link";
-
-const communities = [
-  { name: "Music Lovers", members: "12.4K", color: "from-pink-500 to-rose-600", active: true },
-  { name: "Tech Innovators", members: "8.2K", color: "from-cyan-500 to-blue-600", active: true },
-  { name: "Art & Design", members: "6.9K", color: "from-purple-500 to-violet-600", active: true },
-  { name: "Gaming Hub", members: "15.1K", color: "from-emerald-500 to-teal-600", active: true },
-  { name: "Wellness Circle", members: "4.3K", color: "from-amber-500 to-orange-600", active: true },
-  { name: "Travel Explorers", members: "7.8K", color: "from-indigo-500 to-purple-600", active: true },
-];
 
 export default function CommunitiesSection() {
   return (
@@ -66,9 +57,14 @@ export default function CommunitiesSection() {
             </motion.div>
           </div>
 
-          {/* Right: Community cards */}
+          {/* Right: Community preview cards */}
           <div className="grid sm:grid-cols-2 gap-3">
-            {communities.map((community, i) => (
+            {[
+              { name: "Music Lovers", color: "from-pink-500 to-rose-600" },
+              { name: "Tech Innovators", color: "from-cyan-500 to-blue-600" },
+              { name: "Art & Design", color: "from-purple-500 to-violet-600" },
+              { name: "Gaming Hub", color: "from-emerald-500 to-teal-600" },
+            ].map((community, i) => (
               <motion.div
                 key={community.name}
                 initial={{ opacity: 0, y: 20 }}
@@ -83,15 +79,9 @@ export default function CommunitiesSection() {
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-white">{community.name}</h3>
-                    <p className="text-[10px] text-white/40">{community.members} members</p>
+                    <p className="text-[10px] text-white/40">Join the community</p>
                   </div>
                 </div>
-                {community.active && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    <span className="text-[10px] text-emerald-400/60">Active now</span>
-                  </div>
-                )}
               </motion.div>
             ))}
           </div>

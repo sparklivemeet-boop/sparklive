@@ -1,326 +1,150 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
-import { apiGet, apiPut, apiDelete, apiPost } from '@/lib/apiClient';
+import { Settings, Bell, Shield, Palette, Globe, Smartphone, HelpCircle, CreditCard, LogOut, ChevronRight, Sparkles, Lock, Eye, User, Moon, Sun, Wifi, Download, Users, MessageCircle, Radio, Gift, Star, Zap } from 'lucide-react';
 import Link from 'next/link';
-import {
-  Settings,
-  User,
-  Bell,
-  Shield,
-  Palette,
-  Globe,
-  Lock,
-  ChevronRight,
-  Sparkles,
-  LogOut,
-  Smartphone,
-  CreditCard,
-  HelpCircle,
-  ArrowLeft,
-} from 'lucide-react';
-import Button from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
+import Avatar from '@/components/ui/Avatar';
+import { cn } from '@/lib/utils';
 
-interface PrivacySettings {
-  theme?: string;
-  privacyProfile?: string;
-  privacyMessages?: string;
-  privacyFollows?: string;
-}
-
-interface NotificationPreferences {
-  emailAlerts?: boolean;
-  pushAlerts?: boolean;
-  chatAlerts?: boolean;
-  liveAlerts?: boolean;
-}
-
-const settingsSections = [
+const settingsGroups = [
+  {
+    title: 'General',
+    items: [
+      { icon: Palette, label: 'Appearance', href: '/settings/appearance', description: 'Theme, colors, layout', color: 'from-pink-500/20 to-purple-500/20', iconColor: 'text-pink-400' },
+      { icon: Globe, label: 'Language', href: '/settings/language', description: 'App language & region', color: 'from-cyan-500/20 to-blue-500/20', iconColor: 'text-cyan-400' },
+      { icon: Bell, label: 'Notifications', href: '/settings/notifications', description: 'Push, email, in-app alerts', color: 'from-amber-500/20 to-orange-500/20', iconColor: 'text-amber-400' },
+    ],
+  },
+  {
+    title: 'Privacy & Security',
+    items: [
+      { icon: Lock, label: 'Privacy', href: '/settings/privacy', description: 'Profile, messages, visibility', color: 'from-emerald-500/20 to-green-500/20', iconColor: 'text-emerald-400' },
+      { icon: Shield, label: 'Security', href: '/settings/security', description: 'Password, 2FA, sessions', color: 'from-red-500/20 to-rose-500/20', iconColor: 'text-red-400' },
+      { icon: Eye, label: 'What\'s New', href: '/settings/whats-new', description: 'Latest features & updates', color: 'from-[#00d8ff]/20 to-[#3b82f6]/20', iconColor: 'text-[#00d8ff]' },
+    ],
+  },
   {
     title: 'Account',
     items: [
-      { icon: User, label: 'Profile', description: 'Edit your public profile', href: '/profile/settings' },
-      { icon: Lock, label: 'Privacy', description: 'Control who can see your content', href: '/settings/privacy' },
-      { icon: Bell, label: 'Notifications', description: 'Manage notification preferences', href: '/settings/notifications' },
-      { icon: Shield, label: 'Security', description: 'Password, 2FA, and devices', href: '/settings/security' },
+      { icon: CreditCard, label: 'Payments', href: '/settings/payments', description: 'Payment methods & billing', color: 'from-emerald-500/20 to-teal-500/20', iconColor: 'text-emerald-400' },
+      { icon: Smartphone, label: 'Devices', href: '/settings/device', description: 'Connected devices & sessions', color: 'from-[#7a00cc]/20 to-[#3b82f6]/20', iconColor: 'text-[#7a00cc]' },
+      { icon: HelpCircle, label: 'Help & Support', href: '/settings/help', description: 'FAQ, contact, feedback', color: 'from-amber-500/20 to-yellow-500/20', iconColor: 'text-amber-400' },
     ],
   },
   {
-    title: 'Preferences',
+    title: 'Content & Social',
     items: [
-      { icon: Palette, label: 'Appearance', description: 'Theme, colors, and display', href: '/settings/appearance' },
-      { icon: Globe, label: 'Language & Region', description: 'Content language and timezone', href: '/settings/language' },
-      { icon: Smartphone, label: 'Device & Storage', description: 'Cache, downloads, and data', href: '/settings/device' },
-      { icon: CreditCard, label: 'Payments', description: 'Payment methods and billing', href: '/settings/payments' },
-    ],
-  },
-  {
-    title: 'Support',
-    items: [
-      { icon: HelpCircle, label: 'Help Center', description: 'Guides, FAQs, and support', href: '/settings/help' },
-      { icon: Sparkles, label: "What's New", description: 'Latest features and updates', href: '/settings/whats-new' },
+      { icon: Radio, label: 'Stream Settings', href: '/settings/stream', description: 'Stream quality, chat, moderation', color: 'from-red-500/20 to-pink-500/20', iconColor: 'text-red-400' },
+      { icon: MessageCircle, label: 'Chat Preferences', href: '/settings/chat', description: 'Message privacy, filters, blocks', color: 'from-[#ff007f]/20 to-[#7a00cc]/20', iconColor: 'text-[#ff007f]' },
+      { icon: Gift, label: 'Gifts & Tips', href: '/settings/gifts', description: 'Gift settings, tipping, revenue', color: 'from-amber-500/20 to-orange-500/20', iconColor: 'text-amber-400' },
     ],
   },
 ];
 
 export default function SettingsPage() {
-  const { token, logout } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [privacy, setPrivacy] = useState<PrivacySettings>({
-    theme: 'dark',
-    privacyProfile: 'public',
-    privacyMessages: 'everyone',
-    privacyFollows: 'everyone',
-  });
-  const [notifications, setNotifications] = useState<NotificationPreferences>({
-    emailAlerts: true,
-    pushAlerts: true,
-    chatAlerts: true,
-    liveAlerts: true,
-  });
-  const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadSettings = async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const [privacyData, notificationsData] = await Promise.all([
-        apiGet<PrivacySettings>('/api/settings/privacy', token),
-        apiGet<NotificationPreferences>('/api/settings/notifications', token),
-      ]);
-      setPrivacy(privacyData);
-      setNotifications(notificationsData);
-    } catch (err) {
-      console.error('Failed to load settings', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadSettings();
-  }, [token]);
-
-  const showToast = (message: string) => {
-    setSuccess(message);
-    setTimeout(() => setSuccess(null), 3500);
-  };
-
-  const handleSavePrivacy = async () => {
-    if (!token) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await apiPut('/api/settings/privacy', privacy, token);
-      showToast('Privacy settings saved');
-    } catch (err) {
-      setError((err as Error).message || 'Unable to save privacy settings');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSaveNotifications = async () => {
-    if (!token) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await apiPut('/api/settings/notifications', notifications, token);
-      showToast('Notification preferences saved');
-    } catch (err) {
-      setError((err as Error).message || 'Unable to save notification preferences');
-    } finally {
-      setSaving(false);
-    }
-  };
+  const { user, logout } = useAuth();
 
   return (
-    <div className="min-h-screen pb-24 lg:pb-10">
-      <div className="space-y-6 max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="glass rounded-[32px] p-6 shadow-card">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="space-y-2">
-              <p className="text-[11px] uppercase tracking-[0.3em] text-gray-400">
-                Settings
-              </p>
-              <h1 className="text-3xl lg:text-4xl font-bold text-white">
-                Preferences & account
-              </h1>
-              <p className="text-sm text-gray-400">
-                Manage your profile, privacy, notifications, and account settings.
-              </p>
-            </div>
-            <Link href="/profile">
-              <Button variant="ghost" size="sm" icon={<ArrowLeft size={14} />}>
-                Back to profile
-              </Button>
-            </Link>
-          </div>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="max-w-2xl mx-auto space-y-6 pb-24 lg:pb-10"
+    >
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-3"
+      >
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center">
+          <Settings size={16} className="text-white" />
         </div>
+        <div>
+          <h1 className="text-2xl font-bold text-white">Settings</h1>
+          <p className="text-sm text-white/40">Customize your SparkLive experience</p>
+        </div>
+      </motion.div>
 
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/40 text-red-400 text-sm p-4 rounded-2xl">
-            {error}
+      {/* Profile Summary */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+      >
+        <Link
+          href="/profile"
+          className="flex items-center gap-4 rounded-3xl bg-gradient-to-br from-[#ff007f]/5 via-[#7a00cc]/5 to-[#00d8ff]/5 border border-white/[0.06] p-5 hover:bg-white/[0.04] transition-all duration-200 group"
+        >
+          <div className="relative">
+            <Avatar src={user?.avatar} alt={user?.username || 'User'} size="lg" />
+            <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#0a0a0f]" />
           </div>
-        )}
-
-        {success && (
-          <div className="bg-emerald-500/10 border border-emerald-500/40 text-emerald-300 text-sm p-4 rounded-2xl animate-in">
-            {success}
-          </div>
-        )}
-
-        {/* Settings Sections */}
-        {settingsSections.map((section) => (
-          <div key={section.title} className="glass rounded-[28px] p-5 shadow-card">
-            <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-semibold mb-4">
-              {section.title}
-            </p>
-            <div className="space-y-1">
-              {section.items.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    className="flex items-center gap-4 rounded-xl px-3 py-3 hover:bg-white/[0.03] transition group"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition">
-                      <Icon size={17} className="text-gray-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white">{item.label}</p>
-                      <p className="text-[11px] text-gray-500 mt-0.5">{item.description}</p>
-                    </div>
-                    <ChevronRight size={15} className="text-gray-600" />
-                  </Link>
-                );
-              })}
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-white text-base">{user?.fullName || user?.username || 'User'}</p>
+            <p className="text-sm text-white/40">@{user?.username}</p>
+            <div className="flex items-center gap-2 mt-1.5">
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-[9px] font-medium text-emerald-400 border border-emerald-500/20">Online</span>
+              <span className="text-[10px] text-white/20">Member since {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'N/A'}</span>
             </div>
           </div>
-        ))}
+          <ChevronRight size={16} className="text-white/20 group-hover:text-white/60 transition-colors shrink-0" />
+        </Link>
+      </motion.div>
 
-        {/* Privacy Settings */}
-        <div className="glass rounded-[28px] p-5 shadow-card">
-          <div className="flex items-center gap-2 mb-4">
-            <Shield size={14} className="text-cyan-400" />
-            <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-semibold">
-              Privacy
-            </p>
-          </div>
-          <div className="space-y-4">
-            <label className="space-y-2 text-sm text-gray-300">
-              <span>Profile visibility</span>
-              <select
-                value={privacy.privacyProfile}
-                onChange={(e) =>
-                  setPrivacy((prev) => ({
-                    ...prev,
-                    privacyProfile: e.target.value,
-                  }))
-                }
-                className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-[var(--color-spark-pink)]"
+      {/* Settings Groups */}
+      {settingsGroups.map((group, gi) => (
+        <motion.div
+          key={group.title}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 + gi * 0.05 }}
+        >
+          <h2 className="text-[10px] font-semibold text-white/40 uppercase tracking-[0.2em] mb-3 px-1">{group.title}</h2>
+          <div className="rounded-3xl bg-white/[0.02] border border-white/[0.06] overflow-hidden divide-y divide-white/[0.04]">
+            {group.items.map((item, ii) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center gap-4 px-5 py-4 hover:bg-white/[0.03] transition-all duration-200 group"
               >
-                <option value="public">Public profile</option>
-                <option value="private">Private profile</option>
-              </select>
-            </label>
-            <label className="space-y-2 text-sm text-gray-300">
-              <span>Message permissions</span>
-              <select
-                value={privacy.privacyMessages}
-                onChange={(e) =>
-                  setPrivacy((prev) => ({
-                    ...prev,
-                    privacyMessages: e.target.value,
-                  }))
-                }
-                className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-[var(--color-spark-pink)]"
-              >
-                <option value="everyone">Everyone can message</option>
-                <option value="following">Only people I follow</option>
-                <option value="noone">No one can message</option>
-              </select>
-            </label>
-            <Button
-              variant="primary"
-              size="sm"
-              loading={saving}
-              onClick={handleSavePrivacy}
-            >
-              Save privacy settings
-            </Button>
-          </div>
-        </div>
-
-        {/* Notification Preferences */}
-        <div className="glass rounded-[28px] p-5 shadow-card">
-          <div className="flex items-center gap-2 mb-4">
-            <Bell size={14} className="text-pink-400" />
-            <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-semibold">
-              Notifications
-            </p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {(
-              ['emailAlerts', 'pushAlerts', 'chatAlerts', 'liveAlerts'] as const
-            ).map((field) => (
-              <label
-                key={field}
-                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-gray-300 transition hover:border-[var(--color-spark-pink)]/30"
-              >
-                <input
-                  type="checkbox"
-                  checked={Boolean(notifications[field])}
-                  onChange={(e) =>
-                    setNotifications((prev) => ({
-                      ...prev,
-                      [field]: e.target.checked,
-                    }))
-                  }
-                  className="h-4 w-4 rounded border-white/20 bg-gray-800 text-[var(--color-spark-pink)] focus:ring-[var(--color-spark-pink)]"
-                />
-                <span>
-                  {field === 'emailAlerts'
-                    ? 'Email alerts'
-                    : field === 'pushAlerts'
-                    ? 'Push notifications'
-                    : field === 'chatAlerts'
-                    ? 'Chat alerts'
-                    : 'Live stream alerts'}
-                </span>
-              </label>
+                <div className={cn('w-10 h-10 rounded-xl bg-gradient-to-br border border-white/[0.06] flex items-center justify-center', item.color, item.iconColor)}>
+                  <item.icon size={16} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white">{item.label}</p>
+                  <p className="text-xs text-white/30">{item.description}</p>
+                </div>
+                <ChevronRight size={14} className="text-white/20 group-hover:text-white/60 transition-colors shrink-0" />
+              </Link>
             ))}
           </div>
-          <div className="mt-4">
-            <Button
-              variant="primary"
-              size="sm"
-              loading={saving}
-              onClick={handleSaveNotifications}
-            >
-              Save notification preferences
-            </Button>
-          </div>
-        </div>
+        </motion.div>
+      ))}
 
-        {/* Logout */}
-        <div className="text-center pt-4">
-          <Button
-            variant="danger"
-            size="md"
-            icon={<LogOut size={14} />}
-            onClick={() => logout()}
-          >
-            Logout
-          </Button>
-        </div>
-      </div>
-    </div>
+      {/* Logout */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <button
+          onClick={logout}
+          className="flex items-center gap-3 w-full rounded-3xl bg-red-500/5 border border-red-500/10 p-5 text-red-400 hover:bg-red-500/10 transition-all duration-200 group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+            <LogOut size={16} className="text-red-400" />
+          </div>
+          <div className="flex-1 text-left">
+            <p className="text-sm font-medium">Log Out</p>
+            <p className="text-xs text-red-400/60">Sign out of your account</p>
+          </div>
+          <ChevronRight size={14} className="text-red-400/30 group-hover:text-red-400/60 transition-colors" />
+        </button>
+      </motion.div>
+
+      {/* Version */}
+      <p className="text-center text-[10px] text-white/10 pb-4">SparkLive v2.0 · Premium</p>
+    </motion.div>
   );
 }

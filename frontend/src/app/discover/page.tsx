@@ -1,194 +1,262 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet } from '@/lib/apiClient';
-import { Compass, Sparkles, Heart, MessageCircle, Filter, Users, Radio } from 'lucide-react';
-import Button from '@/components/ui/Button';
-import { SkeletonFeed } from '@/components/ui/Skeleton';
-import CreatePostComposer from '@/components/create/CreatePostComposer';
+import { Sparkles, TrendingUp, Radio, Users, Hash, ChevronRight, Loader2, Compass } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import DiscoverSearch from '@/components/discover/DiscoverSearch';
+import DiscoverHero from '@/components/discover/DiscoverHero';
+import DiscoverTabs from '@/components/discover/DiscoverTabs';
+import DiscoverSidebar from '@/components/discover/DiscoverSidebar';
+import LiveStreamsGrid from '@/components/discover/LiveStreamsGrid';
+import FloatingGoLiveButton from '@/components/profile/FloatingGoLiveButton';
+import PremiumGoLiveModal from '@/components/profile/PremiumGoLiveModal';
 
-interface Profile {
-  id: string;
-  username: string;
-  fullName?: string | null;
-  age?: number | null;
-  city?: string | null;
-  bio?: string | null;
-  photos?: { url: string }[];
-  profile?: { profileImages?: string[]; isOnline?: boolean };
-}
-
-const filterTabs = ['For You', 'Trending', 'Live Now', 'New', 'Popular'];
-
-export default function Discover() {
-  const { token, isLoading: authLoading } = useAuth();
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+export default function DiscoverPage() {
+  const { token } = useAuth();
+  const [activeTab, setActiveTab] = useState('foryou');
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('For You');
+  const [error, setError] = useState<string | null>(null);
+  const [goLiveOpen, setGoLiveOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
+  // Data states - all from backend, no mock data
+  const [liveStreams, setLiveStreams] = useState<any[]>([]);
+  const [creators, setCreators] = useState<any[]>([]);
+
+  const fetchData = useCallback(async () => {
     if (!token) return;
-    const fetchProfiles = async () => {
-      try {
-        const data = await apiGet<Profile[]>('/api/profiles/discover', token);
-        setProfiles(data);
-      } catch (error) {
-        console.error('Failed to fetch discover profiles', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProfiles();
+    setLoading(true);
+    setError(null);
+    try {
+      const [streamsData, creatorsData] = await Promise.all([
+        apiGet<any>('/api/streams/live', token).catch(() => ({ streams: [] })),
+        apiGet<any>('/api/profiles/discover', token).catch(() => []),
+      ]);
+      setLiveStreams(streamsData?.streams ?? streamsData?.data ?? []);
+      setCreators(Array.isArray(creatorsData) ? creatorsData : creatorsData?.profiles ?? []);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load discover feed');
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
 
-  if (authLoading || loading) {
-    return (
-      <div className="min-h-screen px-4 py-8 pb-24 lg:pb-10">
-        <SkeletonFeed />
-      </div>
-    );
-  }
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  const sectionVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: (i: number) => ({
+      opacity: 1, y: 0,
+      transition: { delay: 0.1 + i * 0.05, duration: 0.4, ease: [0.16, 1, 0.3, 1] },
+    }),
+  };
+
+  // Only show sections when real data exists
+  const hasTrendingTopics = false; // Would come from backend trending API
+  const hasCategories = false; // Would come from backend categories API
 
   return (
-    <div className="min-h-screen pb-24 lg:pb-10">
-      <div className="space-y-6">
-        {/* Home Feed Composer */}
-        <CreatePostComposer />
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        className="max-w-7xl mx-auto"
+      >
+        {/* Search Section */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <DiscoverSearch onSearch={handleSearch} />
+        </motion.div>
 
-        <div className="glass rounded-[32px] p-6 shadow-card">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="space-y-2">
-              <p className="text-[11px] uppercase tracking-[0.3em] text-gray-400">Discover</p>
-              <h1 className="text-3xl lg:text-4xl font-bold text-white">Explore people & trending creators</h1>
-              <p className="max-w-2xl text-sm text-gray-400">Find your community, discover live streamers, and connect with like-minded people.</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="ghost" size="sm" icon={<Filter size={14} />}>Filters</Button>
-              <Button variant="primary" size="sm" icon={<Sparkles size={14} />}>Trending now</Button>
-            </div>
-          </div>
-        </div>
+        {/* Tabs */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="mb-6"
+        >
+          <DiscoverTabs activeTab={activeTab} onTabChange={setActiveTab} />
+        </motion.div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="glass rounded-2xl p-4 hover-lift">
-            <p className="text-[11px] uppercase tracking-[0.25em] text-gray-400">Active creators</p>
-            <p className="mt-2 text-2xl font-bold text-white">{profiles.filter((p) => p.profile?.isOnline).length}</p>
-            <p className="mt-1 text-xs text-gray-400">Profiles currently live or nearby.</p>
-          </div>
-          <div className="glass rounded-2xl p-4 hover-lift">
-            <p className="text-[11px] uppercase tracking-[0.25em] text-gray-400">Recommendations</p>
-            <p className="mt-2 text-2xl font-bold text-white">{profiles.length}</p>
-            <p className="mt-1 text-xs text-gray-400">Fresh discover cards for you.</p>
-          </div>
-          <div className="glass rounded-2xl p-4 hover-lift">
-            <p className="text-[11px] uppercase tracking-[0.25em] text-gray-400">Categories</p>
-            <p className="mt-2 text-2xl font-bold text-white">{new Set(profiles.map(p => p.city).filter(Boolean)).size || '—'}</p>
-            <p className="mt-1 text-xs text-gray-400">Unique locations represented.</p>
-          </div>
-        </div>
-
-        <div className="glass rounded-[32px] p-6 shadow-card">
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <h2 className="text-xl font-bold text-white">Profiles</h2>
-            <div className="flex flex-wrap gap-2">
-              {filterTabs.map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
-                    activeTab === tab
-                      ? 'bg-gradient-spark text-white shadow-[0_20px_70px_rgba(255,0,127,0.18)]'
-                      : 'bg-white/5 text-gray-300 hover:bg-white/10'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-          </div>
-          {profiles.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-              <Compass size={48} className="mb-4 opacity-30" />
-              <p className="text-lg font-medium">No profiles found</p>
-              <p className="text-sm mt-2">Check back later for new discoveries.</p>
-            </div>
-          ) : (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {profiles.slice(0, 12).map((profile) => (
-                <div key={profile.id} className="group overflow-hidden rounded-[24px] border border-white/10 bg-black/40 transition-all duration-300 hover:-translate-y-1 hover:border-pink-500/30 hover:shadow-[0_20px_60px_rgba(255,0,127,0.12)]">
-                  <div className="relative h-64 overflow-hidden bg-gray-900">
-                    <img src={profile.photos?.[0]?.url || profile.profile?.profileImages?.[0] || 'https://i.pravatar.cc/600'} alt={profile.username} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" />
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-4">
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${profile.profile?.isOnline ? 'bg-emerald-400/20 text-emerald-100' : 'bg-gray-500/20 text-gray-300'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${profile.profile?.isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-gray-400'}`} />
-                        {profile.profile?.isOnline ? 'Live' : 'Offline'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="p-5">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <h3 className="text-lg font-semibold text-white">{profile.fullName || profile.username}</h3>
-                        <p className="text-sm text-gray-400">{profile.city || 'Global'} {profile.age ? `• ${profile.age}` : ''}</p>
-                      </div>
-                      <span className="text-xs text-gray-500">@{profile.username}</span>
-                    </div>
-                    <p className="mt-3 line-clamp-2 text-sm text-gray-300 leading-relaxed">{profile.bio || 'No bio yet.'}</p>
-                    <div className="mt-4 flex items-center gap-3">
-                      <button className="flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 text-xs text-gray-400 hover:bg-white/10 transition"><Heart size={12} /> Like</button>
-                      <button className="flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 text-xs text-gray-400 hover:bg-white/10 transition"><MessageCircle size={12} /> Chat</button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {profiles.length > 0 && (
-          <div className="grid gap-6 xl:grid-cols-3">
-            <div className="glass rounded-[28px] p-5 shadow-card">
-              <p className="text-[11px] uppercase tracking-[0.3em] text-gray-400 mb-3">Trending streams</p>
-              <div className="space-y-3">
-                {profiles.filter(p => p.profile?.isOnline).slice(0, 3).map((profile) => (
-                  <div key={profile.id} className="rounded-2xl bg-white/5 p-4 border border-white/10 hover-lift">
-                    <p className="text-xs text-gray-400">Streamer</p>
-                    <p className="mt-1 font-semibold text-white">{profile.fullName || profile.username}</p>
-                  </div>
-                ))}
-                {profiles.filter(p => p.profile?.isOnline).length === 0 && (
-                  <p className="text-sm text-gray-500 text-center py-4">No creators are live right now.</p>
-                )}
+        {/* Main Content Grid */}
+        {loading && creators.length === 0 && liveStreams.length === 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="skeleton h-[380px] rounded-3xl" />
+              <div className="skeleton h-12 w-full rounded-2xl" />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="skeleton h-48 rounded-2xl" />
+                <div className="skeleton h-48 rounded-2xl" />
               </div>
             </div>
-            <div className="glass rounded-[28px] p-5 shadow-card">
-              <p className="text-[11px] uppercase tracking-[0.3em] text-gray-400 mb-3">Spotlight</p>
-              {profiles.length > 0 ? (
-                <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-spark p-0.5">
-                    <img src={profiles[0].photos?.[0]?.url || 'https://i.pravatar.cc/150'} alt={profiles[0].username} className="w-full h-full rounded-full object-cover" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-white">{profiles[0].fullName || profiles[0].username}</p>
-                    <p className="text-sm text-gray-400">{profiles[0].city || 'Global'}</p>
+            <div className="space-y-4">
+              <div className="skeleton h-48 rounded-2xl" />
+              <div className="skeleton h-32 rounded-2xl" />
+            </div>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-4">
+              <Loader2 size={24} className="text-red-400" />
+            </div>
+            <h3 className="text-white/50 font-medium text-lg mb-1">Failed to load discover feed</h3>
+            <p className="text-white/30 text-sm mb-4">{error}</p>
+            <button onClick={fetchData} className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white text-sm font-bold">
+              Try Again
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Content */}
+            <div className="lg:col-span-2 space-y-8">
+              {/* Hero Carousel - only show if real data exists */}
+              {liveStreams.length > 0 && (
+                <motion.div
+                  custom={0}
+                  variants={sectionVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  <DiscoverHero />
+                </motion.div>
+              )}
+
+              {/* Live Streams - only shows real data from backend */}
+              <motion.section
+                custom={1}
+                variants={sectionVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Radio size={16} className="text-red-400" />
+                    <h2 className="text-lg font-bold text-white">Live Now</h2>
+                    {liveStreams.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-[10px] font-bold text-red-400 border border-red-500/20">
+                        {liveStreams.length} streams
+                      </span>
+                    )}
                   </div>
                 </div>
-              ) : (
-                <p className="text-sm text-gray-500 text-center py-6">No spotlight profiles available.</p>
+                {liveStreams.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 px-4 text-center rounded-2xl bg-white/[0.02] border border-white/[0.04]">
+                    <Radio size={28} className="text-white/10 mb-3" />
+                    <p className="text-sm text-white/30">No live streams right now</p>
+                    <p className="text-xs text-white/20 mt-1">Check back later for live content</p>
+                  </div>
+                ) : (
+                  <LiveStreamsGrid streams={liveStreams as any} loading={false} />
+                )}
+              </motion.section>
+
+              {/* Recommended Creators - only from real backend data */}
+              {creators.length > 0 && (
+                <motion.section
+                  custom={2}
+                  variants={sectionVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Sparkles size={16} className="text-[#ff007f]" />
+                      <h2 className="text-lg font-bold text-white">Recommended Creators</h2>
+                    </div>
+                  </div>
+                  <div className="flex overflow-x-auto scrollbar-hide gap-4 pb-2">
+                    {creators.slice(0, 8).map((creator: any, i: number) => (
+                      <motion.div
+                        key={creator.id || i}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        className="shrink-0 w-48 rounded-2xl bg-white/[0.02] border border-white/[0.06] overflow-hidden hover:bg-white/[0.04] hover:border-[#ff007f]/20 transition-all duration-300 group cursor-pointer"
+                      >
+                        <div className="h-16 bg-gradient-to-br from-[#ff007f]/20 via-[#7a00cc]/20 to-[#00d8ff]/10" />
+                        <div className="relative px-4 -mt-8">
+                          <div className="w-14 h-14 rounded-full border-2 border-[#0a0a0f] overflow-hidden bg-gradient-to-br from-[#ff007f]/20 to-[#7a00cc]/20 flex items-center justify-center">
+                            <span className="text-lg font-bold text-white/60">
+                              {(creator.fullName || creator.username || 'U').charAt(0)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-4 pt-2">
+                          <p className="text-sm font-semibold text-white truncate">{creator.fullName || creator.username}</p>
+                          <p className="text-[10px] text-gray-500">@{creator.username}</p>
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="text-[10px] text-gray-500">{(creator.followersCount || 0).toLocaleString()} followers</span>
+                            <span className="text-[10px] text-white/30 px-2 py-0.5 rounded-full bg-white/[0.04]">{creator.city || 'Global'}</span>
+                          </div>
+                          {creator.bio && (
+                            <p className="text-[10px] text-white/30 mt-1.5 line-clamp-2">{creator.bio}</p>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.section>
+              )}
+
+              {/* Categories - only shown if real data from backend */}
+              {hasCategories && (
+                <motion.section
+                  custom={3}
+                  variants={sectionVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  <div className="flex items-center gap-2 mb-4">
+                    <Hash size={16} className="text-[#00d8ff]" />
+                    <h2 className="text-lg font-bold text-white">Explore Categories</h2>
+                  </div>
+                </motion.section>
+              )}
+
+              {/* Empty state when nothing at all exists */}
+              {liveStreams.length === 0 && creators.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+                  <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#ff007f]/10 to-[#7a00cc]/10 border border-[#ff007f]/15 flex items-center justify-center mb-5">
+                    <Compass size={36} className="text-[#ff007f]/30" />
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-1">Nothing to discover yet</h3>
+                  <p className="text-sm text-white/30 max-w-sm">
+                    Content will appear here as creators start streaming and posting.
+                  </p>
+                  <button
+                    onClick={fetchData}
+                    className="mt-6 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white text-sm font-bold"
+                  >
+                    Refresh
+                  </button>
+                </div>
               )}
             </div>
-            <div className="glass rounded-[28px] p-5 shadow-card">
-              <p className="text-[11px] uppercase tracking-[0.3em] text-gray-400 mb-3">Activity</p>
-              <div className="space-y-3 text-sm text-gray-300">
-                <p className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-gradient-spark" />{profiles.length} profiles available to discover</p>
-                <p className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-gradient-spark" />{profiles.filter(p => p.profile?.isOnline).length} creators currently online</p>
-                <p className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-gradient-spark" />{new Set(profiles.map(p => p.city).filter(Boolean)).size} cities represented</p>
+
+            {/* Right Sidebar - only rendered, shows empty states internally */}
+            <div className="hidden lg:block">
+              <div className="sticky top-24">
+                <DiscoverSidebar />
               </div>
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </motion.div>
+
+      {/* Floating Go Live */}
+      <FloatingGoLiveButton onClick={() => setGoLiveOpen(true)} />
+      <PremiumGoLiveModal open={goLiveOpen} onClose={() => setGoLiveOpen(false)} />
+    </>
   );
 }

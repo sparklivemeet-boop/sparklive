@@ -83,17 +83,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const storedUser = await storage.getItem(USER_STORAGE_KEY);
 
       if (storedToken && storedUser) {
-        // Restore state from storage immediately so the route guard sees
-        // the authenticated session without waiting for async verification
+        // Restore state from storage immediately
         setToken(storedToken);
         setRefreshToken(storedRefreshToken);
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-        
-        // Unblock the route guard right away so it sees the restored token
-        setIsLoading(false);
+        let parsedUser: AuthUser;
+        try {
+          parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser);
+        } catch {
+          await clearSession();
+          setIsLoading(false);
+          return;
+        }
 
-        // Verify token in background — don't block the UI
+        // Verify token
         try {
           const response = await authGetMe(storedToken);
           if (response.user) {
@@ -107,6 +110,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               const newToken = await refreshAccessToken(storedRefreshToken);
               if (newToken) {
                 // Refresh succeeded — user stays authenticated
+                setIsLoading(false);
                 return;
               }
             } catch {
@@ -117,7 +121,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           await clearSession();
         }
 
-        // Early return since we already set isLoading(false) above
+        setIsLoading(false);
         return;
       }
     } catch (error) {

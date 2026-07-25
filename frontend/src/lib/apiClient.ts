@@ -225,7 +225,7 @@ const makeRequestInternal = async <T>(
       console.error(`[API] Error ${method} ${url}:`, error);
       throw new ApiError(
         500,
-        error instanceof Error ? error.message : 'Failed to fetch',
+        error instanceof Error ? error.message : 'Network Error',
         error
       );
     }

@@ -1,71 +1,82 @@
-'use client';
+"use client";
 
 import { useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { ArrowLeft, Shield, Save, Key } from 'lucide-react';
-import Button from '@/components/ui/Button';
+import { ArrowLeft, Shield, Key, Smartphone, Fingerprint, Eye, EyeOff, Check } from 'lucide-react';
 import Link from 'next/link';
 
-export default function SecuritySettingsPage() {
-  const { token } = useAuth();
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleChangePassword = async () => {
-    if (!token || !currentPassword || !newPassword) return;
-    setSaving(true); setError(null);
-    try {
-      const { apiPut } = await import('@/lib/apiClient');
-      await apiPut('/api/settings/account', { currentPassword, newPassword }, token);
-      setSuccess('Password changed successfully');
-      setCurrentPassword(''); setNewPassword('');
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (err) { setError((err as Error).message || 'Failed to change password'); }
-    finally { setSaving(false); }
-  };
+export default function SecuritySettings() {
+  const [twoFA, setTwoFA] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <div className="min-h-screen pb-24 lg:pb-10">
-      <div className="max-w-2xl mx-auto space-y-6 p-6">
-        <div className="flex items-center gap-4">
-          <Link href="/settings"><Button variant="ghost" size="sm" icon={<ArrowLeft size={16} />}>Back</Button></Link>
-          <div>
-            <h1 className="text-2xl font-bold text-white">Security</h1>
-            <p className="text-sm text-gray-400">Manage your password and account security.</p>
+    <div className="space-y-6 pb-6 max-w-2xl">
+      <Link href="/settings" className="inline-flex items-center gap-2 text-sm text-white/40 hover:text-white/60 transition-colors">
+        <ArrowLeft size={14} /> Back to Settings
+      </Link>
+      <h1 className="text-2xl font-bold text-white">Security</h1>
+
+      <div className="glass rounded-[var(--radius-2xl)] p-6 space-y-6">
+        <div>
+          <h2 className="text-sm font-semibold text-white mb-4">Change Password</h2>
+          <form className="space-y-4">
+            <div>
+              <label className="form-label">Current Password</label>
+              <div className="relative">
+                <input type={showPassword ? "text" : "password"} className="form-input pr-12" placeholder="Enter current password" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/50">
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="form-label">New Password</label>
+              <input type="password" className="form-input" placeholder="Enter new password" />
+            </div>
+            <div>
+              <label className="form-label">Confirm New Password</label>
+              <input type="password" className="form-input" placeholder="Confirm new password" />
+            </div>
+            <button type="submit" className="btn-primary">Update Password</button>
+          </form>
+        </div>
+
+        <div className="divider" />
+
+        <div>
+          <h2 className="text-sm font-semibold text-white mb-4">Two-Factor Authentication</h2>
+          <div className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+            <div className="flex items-center gap-3">
+              <Fingerprint size={18} className="text-purple-400" />
+              <div>
+                <p className="text-sm font-medium text-white">Two-Factor Auth</p>
+                <p className="text-xs text-white/40">Add an extra layer of security</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setTwoFA(!twoFA)}
+              className={`relative w-11 h-6 rounded-full transition-colors ${twoFA ? 'bg-pink-500' : 'bg-white/[0.1]'}`}
+            >
+              <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${twoFA ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+            </button>
           </div>
         </div>
-        {error && <div className="bg-red-500/10 border border-red-500/40 text-red-400 text-sm p-4 rounded-2xl">{error}</div>}
-        {success && <div className="bg-emerald-500/10 border border-emerald-500/40 text-emerald-300 text-sm p-4 rounded-2xl">{success}</div>}
 
-        <div className="glass rounded-[28px] p-6 shadow-card space-y-5">
-          <div className="flex items-center gap-2 mb-2">
-            <Key size={16} className="text-pink-400" />
-            <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-semibold">Change Password</p>
-          </div>
-          <label className="space-y-2 text-sm text-gray-300">
-            <span>Current password</span>
-            <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-[var(--color-spark-pink)]" />
-          </label>
-          <label className="space-y-2 text-sm text-gray-300">
-            <span>New password</span>
-            <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-[var(--color-spark-pink)]" />
-            <p className="text-xs text-gray-500">At least 8 characters</p>
-          </label>
-          <Button variant="primary" onClick={handleChangePassword} loading={saving} icon={<Save size={14} />} disabled={!currentPassword || !newPassword}>Update password</Button>
-        </div>
+        <div className="divider" />
 
-        <div className="glass rounded-[28px] p-6 shadow-card">
-          <div className="flex items-center gap-2 mb-4">
-            <Shield size={16} className="text-cyan-400" />
-            <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-semibold">Two-Factor Authentication</p>
+        <div>
+          <h2 className="text-sm font-semibold text-white mb-4">Active Sessions</h2>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+              <div className="flex items-center gap-3">
+                <Smartphone size={18} className="text-cyan-400" />
+                <div>
+                  <p className="text-sm font-medium text-white">Current Session</p>
+                  <p className="text-xs text-white/40">Windows • Chrome • Now</p>
+                </div>
+              </div>
+              <span className="badge-green text-[10px]">Active</span>
+            </div>
           </div>
-          <p className="text-sm text-gray-400 mb-4">Add an extra layer of security to your account.</p>
-          <Button variant="outline" disabled>Coming soon</Button>
         </div>
       </div>
     </div>

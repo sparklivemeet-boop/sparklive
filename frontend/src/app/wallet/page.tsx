@@ -1,495 +1,587 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import {
-  Wallet,
-  Gift,
-  ArrowUpRight,
-  ArrowDownLeft,
-  Clock,
-  Copy,
-  Check,
-  ExternalLink,
-  Sparkles,
-  Coins,
-  CreditCard,
-} from 'lucide-react';
-import { fetchWallet, fetchCoinTransactions, fetchGiftHistory, fetchWithdrawals, requestWithdrawal, saveWalletAddress, getWelcomeRewardStatus, claimWelcomeReward } from '@/lib/services';
+import { useEffect, useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
-import { useI18n } from '@/lib/i18n/context';
-
-type Tab = 'overview' | 'coins' | 'gifts' | 'withdrawals';
-
-const MIN_WITHDRAWAL_USD = 20;
+import { apiGet } from '@/lib/apiClient';
+import { Wallet, Plus, ArrowUpRight, ArrowDownLeft, Gift, Sparkles, Loader2, History, TrendingUp, Filter, Search, ChevronRight, AlertTriangle, Shield, Clock, ExternalLink, Ban, ShoppingBag, Coins, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import WalletBalanceCard from '@/components/wallet/WalletBalanceCard';
+import BuyCoinsModal from '@/components/wallet/BuyCoinsModal';
 
 export default function WalletPage() {
-  const router = useRouter();
-  const { user } = useAuth();
-  const { t } = useI18n();
-  const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const { token } = useAuth();
   const [wallet, setWallet] = useState<any>(null);
-  const [coinTxs, setCoinTxs] = useState<any[]>([]);
-  const [giftHistory, setGiftHistory] = useState<any>({ sentGifts: [], receivedGifts: [] });
-  const [withdrawals, setWithdrawals] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [gifts, setGifts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [usdtAddress, setUsdtAddress] = useState('');
-  const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [withdrawAddress, setWithdrawAddress] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [withdrawing, setWithdrawing] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [welcomeReward, setWelcomeReward] = useState<any>(null);
-  const [claimingReward, setClaimingReward] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'all' | 'credit' | 'debit'>('all');
+  const [showBuyModal, setShowBuyModal] = useState(false);
+  const [showGiftModal, setShowGiftModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'transactions' | 'gifts'>('transactions');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
+  const fetchWallet = useCallback(async () => {
+    if (!token) return;
     setLoading(true);
+    setError(null);
     try {
-      const [walletData, coinData, giftData, withdrawalData, rewardStatus] = await Promise.all([
-        fetchWallet().catch(() => null),
-        fetchCoinTransactions().catch(() => []),
-        fetchGiftHistory().catch(() => ({ sentGifts: [], receivedGifts: [] })),
-        fetchWithdrawals().catch(() => []),
-        getWelcomeRewardStatus().catch(() => null),
+      const [walletData, txData, giftData] = await Promise.all([
+        apiGet<any>('/api/wallets/me', token).catch(() => null),
+        apiGet<any>('/api/wallets/transactions', token).catch(() => ({ transactions: [] })),
+        apiGet<any>('/api/wallets/gifts', token).catch(() => ({ gifts: [] })),
       ]);
-      if (walletData) setWallet(walletData);
-      if (coinData) setCoinTxs(Array.isArray(coinData) ? coinData : []);
-      if (giftData) setGiftHistory(giftData);
-      if (withdrawalData) setWithdrawals(Array.isArray(withdrawalData) ? withdrawalData : []);
-      if (rewardStatus) {
-        setWelcomeReward(rewardStatus);
-        setUsdtAddress(walletData?.usdtWalletAddress || '');
-      }
-    } catch (err) {
-      console.error('Failed to load wallet data:', err);
-    }
-    setLoading(false);
-  }
-
-  async function handleClaimReward() {
-    setClaimingReward(true);
-    setMessage(null);
-    try {
-      const result = await claimWelcomeReward();
-      setMessage({ type: 'success', text: 'Welcome reward claimed! 100 Spark Coins added.' });
-      setWelcomeReward({ ...welcomeReward, claimed: true, claimedAt: new Date().toISOString() });
-      await loadData();
+      setWallet(walletData);
+      const txList = Array.isArray(txData) ? txData : txData?.transactions ?? txData?.data ?? [];
+      setTransactions(Array.isArray(txList) ? txList : []);
+      const giftList = Array.isArray(giftData) ? giftData : giftData?.gifts ?? giftData?.data ?? [];
+      setGifts(Array.isArray(giftList) ? giftList : []);
     } catch (err: any) {
-      setMessage({ type: 'error', text: err?.message || 'Failed to claim reward' });
+      setError(err.message || 'Failed to load wallet');
+    } finally {
+      setLoading(false);
     }
-    setClaimingReward(false);
-  }
+  }, [token]);
 
-  async function handleSaveAddress() {
-    if (!usdtAddress.trim()) return;
-    setSaving(true);
-    setMessage(null);
-    try {
-      await saveWalletAddress(usdtAddress.trim());
-      setMessage({ type: 'success', text: 'USDT (BEP-20) wallet address saved.' });
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err?.message || 'Invalid wallet address format' });
-    }
-    setSaving(false);
-  }
+  useEffect(() => { fetchWallet(); }, [fetchWallet]);
 
-  async function handleWithdraw() {
-    const amount = parseFloat(withdrawAmount);
-    if (!amount || amount < MIN_WITHDRAWAL_USD) {
-      setMessage({ type: 'error', text: `Minimum withdrawal is $${MIN_WITHDRAWAL_USD} USD` });
-      return;
-    }
-    if (!withdrawAddress.trim()) {
-      setMessage({ type: 'error', text: 'Wallet address is required' });
-      return;
-    }
-    setWithdrawing(true);
-    setMessage(null);
-    try {
-      await requestWithdrawal({ amount, walletAddress: withdrawAddress.trim() });
-      setMessage({ type: 'success', text: `Withdrawal request for $${amount} USDT (BEP-20) submitted.` });
-      setWithdrawAmount('');
-      setWithdrawAddress('');
-      await loadData();
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err?.message || 'Withdrawal failed' });
-    }
-    setWithdrawing(false);
-  }
+  const coinBalance = wallet?.coinBalance ?? 0;
+  const usdtBalance = wallet?.usdtBalance ?? 0;
+  const walletAddress = wallet?.walletAddress;
 
-  const tabs: { id: Tab; label: string; icon: any }[] = [
-    { id: 'overview', label: 'Overview', icon: Wallet },
-    { id: 'coins', label: 'Coins', icon: Coins },
-    { id: 'gifts', label: 'Gifts', icon: Gift },
-    { id: 'withdrawals', label: 'Withdrawals', icon: ArrowUpRight },
-  ];
+  const securityStatus = {
+    twoFactor: wallet?.twoFactorEnabled ?? false,
+    deviceVerified: wallet?.deviceVerified ?? false,
+    lastLogin: wallet?.lastLogin,
+  };
 
-  return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#ff007f] to-[#7a00cc] flex items-center justify-center">
-          <Wallet size={20} className="text-white" />
+  const filteredTx = transactions.filter(tx => {
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      if (!tx.description?.toLowerCase().includes(q) && !tx.type?.toLowerCase().includes(q)) return false;
+    }
+    if (filter === 'all') return true;
+    return tx.type === (filter === 'credit' ? 'CREDIT' : 'DEBIT');
+  });
+
+  const handleCoinsPurchased = (coins: number) => {
+    setWallet((prev: any) => prev ? { ...prev, coinBalance: (prev.coinBalance || 0) + coins } : prev);
+    setShowBuyModal(false);
+    fetchWallet();
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-3xl mx-auto space-y-6">
+        <div className="skeleton h-8 w-32" />
+        <div className="skeleton h-72 rounded-3xl" />
+        <div className="grid grid-cols-2 gap-4">
+          <div className="skeleton h-32 rounded-2xl" />
+          <div className="skeleton h-32 rounded-2xl" />
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-white">Wallet</h1>
-          <p className="text-xs text-gray-500">Manage your Spark Coins, gifts, and withdrawals</p>
+        <div className="skeleton h-12 w-full rounded-2xl" />
+        <div className="space-y-2">
+          {[1, 2, 3].map(i => <div key={i} className="skeleton h-16 w-full rounded-2xl" />)}
         </div>
       </div>
+    );
+  }
 
-      {/* Welcome Reward Banner */}
-      {welcomeReward && !welcomeReward.claimed && (
+  if (error) {
+    return (
+      <div className="max-w-3xl mx-auto flex flex-col items-center justify-center py-24">
+        <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-4">
+          <Loader2 size={24} className="text-red-400" />
+        </div>
+        <h2 className="text-lg font-medium text-white/60 mb-2">Failed to load wallet</h2>
+        <p className="text-sm text-white/30 mb-6">{error}</p>
+        <button onClick={fetchWallet} className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white text-sm font-bold">
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="max-w-3xl mx-auto space-y-6 pb-24 lg:pb-10"
+      >
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl bg-gradient-to-r from-[#ff007f]/10 to-[#7a00cc]/10 border border-[#ff007f]/20 p-5"
+          className="flex items-center justify-between"
         >
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#ff007f] to-[#7a00cc] flex items-center justify-center">
-              <Sparkles size={24} className="text-white" />
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
+              <Wallet size={16} className="text-white" />
             </div>
-            <div className="flex-1">
-              <h3 className="text-lg font-bold text-white">Welcome! 🎉</h3>
-              <p className="text-sm text-gray-400">Claim your <span className="text-[#ff007f] font-bold">100 Spark Coins</span> welcome reward. One-time only!</p>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Wallet</h1>
+              <p className="text-sm text-white/40">Manage your Spark Coins and payments</p>
             </div>
-            <button
-              onClick={handleClaimReward}
-              disabled={claimingReward}
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white font-semibold text-sm hover:opacity-90 transition disabled:opacity-50"
-            >
-              {claimingReward ? 'Claiming...' : 'Claim Reward'}
-            </button>
           </div>
         </motion.div>
-      )}
 
-      {/* Message Toast */}
-      {message && (
-        <div className={`rounded-xl p-4 text-sm ${
-          message.type === 'success' ? 'bg-green-500/10 border border-green-500/20 text-green-400' : 'bg-red-500/10 border border-red-500/20 text-red-400'
-        }`}>
-          {message.text}
-        </div>
-      )}
+        {/* Balance Card */}
+        <WalletBalanceCard
+          coinBalance={coinBalance}
+          usdtBalance={usdtBalance}
+          walletAddress={walletAddress}
+          isConnected={!!wallet}
+          securityStatus={securityStatus}
+          onBuyCoins={() => setShowBuyModal(true)}
+          onGiftCoins={() => setShowGiftModal(true)}
+          onTransactions={() => setActiveTab('transactions')}
+        />
 
-      {/* Balance Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="rounded-2xl bg-gradient-to-br from-[#ff007f]/20 to-[#7a00cc]/20 border border-[#ff007f]/10 p-5">
-          <div className="flex items-center gap-3 mb-3">
-            <Coins size={20} className="text-[#ff007f]" />
-            <span className="text-sm text-gray-400">Spark Coins</span>
-          </div>
-          <p className="text-3xl font-bold text-white">{wallet?.coinBalance || 0}</p>
-          <p className="text-xs text-gray-500 mt-1">Non-withdrawable. Use for gifts & features.</p>
-        </div>
-        <div className="rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5">
-          <div className="flex items-center gap-3 mb-3">
-            <CreditCard size={20} className="text-green-400" />
-            <span className="text-sm text-gray-400">Earnings</span>
-          </div>
-          <p className="text-3xl font-bold text-white">${wallet?.earningsBalance?.toFixed(2) || '0.00'}</p>
-          <p className="text-xs text-gray-500 mt-1">Withdrawable via USDT (BEP-20)</p>
-        </div>
-        <div className="rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5">
-          <div className="flex items-center gap-3 mb-3">
-            <Gift size={20} className="text-[#00d8ff]" />
-            <span className="text-sm text-gray-400">Gifts</span>
-          </div>
-          <p className="text-3xl font-bold text-white">
-            {giftHistory.receivedGifts?.length || 0}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">Total gifts received</p>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-white/[0.06] pb-3 overflow-x-auto">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
+        {/* Buy Coins / Gift Coins Quick Actions - only if balance is 0 */}
+        {coinBalance === 0 && transactions.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="flex flex-col items-center justify-center py-12 px-4 text-center rounded-3xl bg-white/[0.02] border border-white/[0.04]"
+          >
+            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/15 flex items-center justify-center mb-5">
+              <Coins size={36} className="text-amber-400/40" />
+            </div>
+            <h3 className="text-lg font-bold text-white mb-1">No Spark Coins yet</h3>
+            <p className="text-sm text-white/30 max-w-sm mb-6">
+              Purchase coins to support your favourite creators and unlock premium features.
+            </p>
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
-                isActive
-                  ? 'bg-gradient-to-r from-[#ff007f]/10 to-[#7a00cc]/10 text-white border border-[#ff007f]/10'
-                  : 'text-gray-500 hover:text-gray-300 hover:bg-white/[0.04]'
-              }`}
+              onClick={() => setShowBuyModal(true)}
+              className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white text-sm font-bold shadow-lg shadow-[#ff007f]/20 hover:shadow-[#ff007f]/30 transition-all"
             >
-              <Icon size={16} />
-              {tab.label}
+              <Plus size={16} className="inline mr-2" />
+              Buy Spark Coins
             </button>
-          );
-        })}
-      </div>
-
-      {/* Tab Content */}
-      <motion.div key={activeTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            {/* Spark Coin Info */}
-            <div className="rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5">
-              <h3 className="text-sm font-semibold text-white mb-3">About Spark Coins</h3>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#ff007f] mt-1.5 flex-shrink-0" />
-                  <span>Spark Coins are non-withdrawable and can only be used inside SparkLive.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#ff007f] mt-1.5 flex-shrink-0" />
-                  <span>Spend coins on Virtual Gifts and future premium in-app features.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#ff007f] mt-1.5 flex-shrink-0" />
-                  <span>Coins cannot be converted to cash or transferred between users (except via official gifting).</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Welcome Reward Status */}
-            {welcomeReward?.claimed && (
-              <div className="rounded-2xl bg-green-500/5 border border-green-500/10 p-4">
-                <div className="flex items-center gap-3">
-                  <Check size={18} className="text-green-400" />
-                  <div>
-                    <p className="text-sm font-medium text-green-400">Welcome Reward Claimed</p>
-                    <p className="text-xs text-gray-500">
-                      {welcomeReward.coins} Spark Coins awarded on {new Date(welcomeReward.claimedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* USDT Wallet Address */}
-            <div className="rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5">
-              <h3 className="text-sm font-semibold text-white mb-3">USDT (BEP-20) Withdrawal Address</h3>
-              <p className="text-xs text-gray-500 mb-3">Only USDT on BNB Smart Chain (BEP-20) is supported for withdrawals.</p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={usdtAddress}
-                  onChange={(e) => setUsdtAddress(e.target.value)}
-                  placeholder="0x... (BEP-20 wallet address)"
-                  className="flex-1 rounded-xl border border-white/[0.06] bg-white/[0.04] px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#ff007f]/30"
-                />
-                <button
-                  onClick={handleSaveAddress}
-                  disabled={saving || !usdtAddress.trim()}
-                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
-                >
-                  {saving ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-            </div>
-
-            {/* Recent Coin Transactions */}
-            <div className="rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5">
-              <h3 className="text-sm font-semibold text-white mb-3">Recent Coin Activity</h3>
-              {coinTxs.length === 0 ? (
-                <p className="text-sm text-gray-500">No coin transactions yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {coinTxs.slice(0, 5).map((tx: any) => (
-                    <div key={tx.id} className="flex items-center justify-between py-2 border-b border-white/[0.04] last:border-0">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                          tx.type === 'WELCOME_REWARD' ? 'bg-[#ff007f]/10 text-[#ff007f]' :
-                          tx.type === 'GIFT_SENT' ? 'bg-red-500/10 text-red-400' :
-                          'bg-green-500/10 text-green-400'
-                        }`}>
-                          {tx.type === 'WELCOME_REWARD' ? <Sparkles size={14} /> :
-                           tx.type === 'GIFT_SENT' ? <ArrowUpRight size={14} /> :
-                           <ArrowDownLeft size={14} />}
-                        </div>
-                        <div>
-                          <p className="text-sm text-white capitalize">{tx.type.replace(/_/g, ' ')}</p>
-                          <p className="text-xs text-gray-500">{new Date(tx.createdAt).toLocaleDateString()}</p>
-                        </div>
-                      </div>
-                      <span className="text-sm font-medium text-green-400">+{tx.amount}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          </motion.div>
         )}
 
-        {/* Coins Tab */}
-        {activeTab === 'coins' && (
-          <div className="rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5">
-            <h3 className="text-sm font-semibold text-white mb-3">Coin Transaction History</h3>
-            {coinTxs.length === 0 ? (
-              <p className="text-sm text-gray-500">No coin transactions yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {coinTxs.map((tx: any) => (
-                  <div key={tx.id} className="flex items-center justify-between py-2 border-b border-white/[0.04] last:border-0">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                        tx.type === 'WELCOME_REWARD' ? 'bg-[#ff007f]/10 text-[#ff007f]' :
-                        tx.type === 'GIFT_SENT' ? 'bg-red-500/10 text-red-400' :
-                        'bg-green-500/10 text-green-400'
-                      }`}>
-                        {tx.type === 'WELCOME_REWARD' ? <Sparkles size={14} /> :
-                         tx.type === 'GIFT_SENT' ? <ArrowUpRight size={14} /> :
-                         <ArrowDownLeft size={14} />}
-                      </div>
-                      <div>
-                        <p className="text-sm text-white capitalize">{tx.type.replace(/_/g, ' ')}</p>
-                        <p className="text-xs text-gray-500">{tx.description || ''}</p>
-                        <p className="text-xs text-gray-600">{new Date(tx.createdAt).toLocaleString()}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className={`text-sm font-medium ${tx.amount > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {tx.amount > 0 ? '+' : ''}{tx.amount}
-                      </span>
-                      {tx.balance !== undefined && (
-                        <p className="text-xs text-gray-600">Balance: {tx.balance}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {/* Tabs: Transactions & Gifts */}
+        {(coinBalance > 0 || transactions.length > 0 || gifts.length > 0) && (
+          <>
+            {/* Tab Bar */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="flex items-center gap-1 bg-white/[0.04] rounded-xl p-1 w-fit"
+            >
+              <button
+                onClick={() => setActiveTab('transactions')}
+                className={cn(
+                  'px-4 py-2 rounded-lg text-xs font-medium transition-all',
+                  activeTab === 'transactions' ? 'bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white' : 'text-gray-500 hover:text-white'
+                )}
+              >
+                <History size={12} className="inline mr-1.5" />
+                Transactions
+              </button>
+              <button
+                onClick={() => setActiveTab('gifts')}
+                className={cn(
+                  'px-4 py-2 rounded-lg text-xs font-medium transition-all',
+                  activeTab === 'gifts' ? 'bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white' : 'text-gray-500 hover:text-white'
+                )}
+              >
+                <Gift size={12} className="inline mr-1.5" />
+                Gifts
+              </button>
+            </motion.div>
 
-        {/* Gifts Tab */}
-        {activeTab === 'gifts' && (
-          <div className="space-y-4">
-            <div className="rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5">
-              <h3 className="text-sm font-semibold text-white mb-3">Received Gifts</h3>
-              {giftHistory.receivedGifts?.length === 0 ? (
-                <p className="text-sm text-gray-500">No gifts received yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {giftHistory.receivedGifts?.map((gift: any) => (
-                    <div key={gift.id} className="flex items-center justify-between py-2 border-b border-white/[0.04] last:border-0">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
-                          <Gift size={14} className="text-green-400" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-white">{gift.gift?.name || 'Gift'}</p>
-                          <p className="text-xs text-gray-500">From @{gift.sender?.username || 'anonymous'}</p>
-                        </div>
-                      </div>
-                      <span className="text-sm text-[#ff007f]">{gift.amount} coins</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5">
-              <h3 className="text-sm font-semibold text-white mb-3">Sent Gifts</h3>
-              {giftHistory.sentGifts?.length === 0 ? (
-                <p className="text-sm text-gray-500">No gifts sent yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {giftHistory.sentGifts?.map((gift: any) => (
-                    <div key={gift.id} className="flex items-center justify-between py-2 border-b border-white/[0.04] last:border-0">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
-                          <Gift size={14} className="text-red-400" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-white">{gift.gift?.name || 'Gift'}</p>
-                          <p className="text-xs text-gray-500">To @{gift.receiver?.username || 'user'}</p>
-                        </div>
-                      </div>
-                      <span className="text-sm text-red-400">-{gift.amount} coins</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Withdrawals Tab */}
-        {activeTab === 'withdrawals' && (
-          <div className="space-y-4">
-            {/* Withdrawal Form */}
-            <div className="rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5">
-              <h3 className="text-sm font-semibold text-white mb-3">Request USDT (BEP-20) Withdrawal</h3>
-              <p className="text-xs text-gray-500 mb-4">
-                Minimum withdrawal: ${MIN_WITHDRAWAL_USD} USD. Only USDT on BNB Smart Chain (BEP-20) is supported.
-                Only creators who receive gifts can withdraw.
-              </p>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Amount (USD)</label>
-                  <input
-                    type="number"
-                    value={withdrawAmount}
-                    onChange={(e) => setWithdrawAmount(e.target.value)}
-                    min={MIN_WITHDRAWAL_USD}
-                    step="0.01"
-                    placeholder={`Min $${MIN_WITHDRAWAL_USD}`}
-                    className="w-full rounded-xl border border-white/[0.06] bg-white/[0.04] px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#ff007f]/30"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">USDT (BEP-20) Wallet Address</label>
+            {/* Search & Filter */}
+            {activeTab === 'transactions' && transactions.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.12 }}
+                className="flex flex-col sm:flex-row gap-3"
+              >
+                <div className="relative flex-1">
+                  <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
                   <input
                     type="text"
-                    value={withdrawAddress}
-                    onChange={(e) => setWithdrawAddress(e.target.value)}
-                    placeholder="0x..."
-                    className="w-full rounded-xl border border-white/[0.06] bg-white/[0.04] px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#ff007f]/30"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Search transactions..."
+                    className="w-full rounded-2xl border border-white/[0.06] bg-white/[0.04] py-2.5 pl-10 pr-4 text-sm text-white placeholder-gray-500 outline-none focus:border-[#ff007f]/30 transition-all"
                   />
                 </div>
-                <button
-                  onClick={handleWithdraw}
-                  disabled={withdrawing || !withdrawAmount || !withdrawAddress}
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white font-semibold text-sm hover:opacity-90 transition disabled:opacity-50"
-                >
-                  {withdrawing ? 'Processing...' : `Withdraw USDT (BEP-20)`}
-                </button>
-              </div>
-            </div>
-
-            {/* Withdrawal History */}
-            <div className="rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5">
-              <h3 className="text-sm font-semibold text-white mb-3">Withdrawal History</h3>
-              {withdrawals.length === 0 ? (
-                <p className="text-sm text-gray-500">No withdrawals yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {withdrawals.map((w: any) => (
-                    <div key={w.id} className="flex items-center justify-between py-2 border-b border-white/[0.04] last:border-0">
-                      <div>
-                        <p className="text-sm text-white">${w.amount.toFixed(2)} USDT</p>
-                        <p className="text-xs text-gray-500">{w.walletAddress?.slice(0, 10)}...{w.walletAddress?.slice(-4)}</p>
-                        <p className="text-xs text-gray-600">{new Date(w.createdAt).toLocaleString()}</p>
-                      </div>
-                      <span className={`text-xs font-medium px-2 py-1 rounded-lg ${
-                        w.status === 'COMPLETED' ? 'bg-green-500/10 text-green-400' :
-                        w.status === 'PENDING' ? 'bg-yellow-500/10 text-yellow-400' :
-                        w.status === 'REJECTED' ? 'bg-red-500/10 text-red-400' :
-                        'bg-gray-500/10 text-gray-400'
-                      }`}>
-                        {w.status}
-                      </span>
-                    </div>
+                <div className="flex items-center gap-1 bg-white/[0.04] rounded-xl p-1">
+                  {(['all', 'credit', 'debit'] as const).map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setFilter(f)}
+                      className={cn(
+                        'px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all',
+                        filter === f ? 'bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white' : 'text-gray-500 hover:text-white'
+                      )}
+                    >
+                      {f === 'all' ? 'All' : f === 'credit' ? 'Received' : 'Sent'}
+                    </button>
                   ))}
                 </div>
-              )}
+              </motion.div>
+            )}
+
+            {/* Transactions */}
+            {activeTab === 'transactions' && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <History size={16} className="text-white/40" />
+                    <h2 className="text-lg font-bold text-white">Transaction History</h2>
+                  </div>
+                  {transactions.length > 0 && (
+                    <span className="text-xs text-white/20">{transactions.length} total</span>
+                  )}
+                </div>
+
+                {transactions.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 px-4 text-center rounded-2xl bg-white/[0.02] border border-white/[0.04]">
+                    <Wallet size={32} className="text-white/10 mb-3" />
+                    <h3 className="text-white/50 font-medium text-base mb-1">No transactions yet</h3>
+                    <p className="text-white/25 text-sm max-w-xs">
+                      Your transaction history will appear here when you send or receive coins.
+                    </p>
+                  </div>
+                ) : filteredTx.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 px-4 text-center rounded-2xl bg-white/[0.02] border border-white/[0.04]">
+                    <Search size={28} className="text-white/10 mb-3" />
+                    <p className="text-sm text-white/30">No transactions match your search</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {filteredTx.map((tx: any, i: number) => {
+                      const isCredit = tx.type === 'CREDIT' || tx.type === 'PURCHASE';
+                      return (
+                        <motion.div
+                          key={tx.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.02 }}
+                          className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white/[0.03] transition-all cursor-pointer group"
+                        >
+                          <div className={cn(
+                            'w-10 h-10 rounded-xl flex items-center justify-center border',
+                            isCredit ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'
+                          )}>
+                            {isCredit ? (
+                              <ArrowDownLeft size={16} className="text-emerald-400" />
+                            ) : (
+                              <ArrowUpRight size={16} className="text-red-400" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-white">
+                              {tx.description || (isCredit ? 'Coins Received' : 'Coins Sent')}
+                            </p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-white/30">
+                                {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                              </span>
+                              {tx.network && (
+                                <>
+                                  <span className="text-[10px] text-white/20">·</span>
+                                  <span className="text-[10px] text-white/30">{tx.network}</span>
+                                </>
+                              )}
+                              {tx.status && (
+                                <>
+                                  <span className="text-[10px] text-white/20">·</span>
+                                  <span className={cn(
+                                    'text-[10px]',
+                                    tx.status === 'COMPLETED' && 'text-emerald-400',
+                                    tx.status === 'PENDING' && 'text-amber-400',
+                                    tx.status === 'FAILED' && 'text-red-400',
+                                  )}>
+                                    {tx.status}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className={cn('text-sm font-bold', isCredit ? 'text-emerald-400' : 'text-red-400')}>
+                              {isCredit ? '+' : '-'}{(tx.amount ?? 0).toLocaleString()}
+                            </p>
+                            {tx.balanceAfter != null && (
+                              <p className="text-[9px] text-white/20">Balance: {tx.balanceAfter.toLocaleString()}</p>
+                            )}
+                          </div>
+                          {tx.txHash && (
+                            <a
+                              href={`https://bscscan.com/tx/${tx.txHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 rounded-lg text-white/10 hover:text-[#00d8ff] transition-colors opacity-0 group-hover:opacity-100"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <ExternalLink size={12} />
+                            </a>
+                          )}
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* Gifts */}
+            {activeTab === 'gifts' && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Gift size={16} className="text-white/40" />
+                    <h2 className="text-lg font-bold text-white">Gift History</h2>
+                  </div>
+                </div>
+
+                {gifts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 px-4 text-center rounded-2xl bg-white/[0.02] border border-white/[0.04]">
+                    <Gift size={32} className="text-white/10 mb-3" />
+                    <h3 className="text-white/50 font-medium text-base mb-1">No gifts sent yet</h3>
+                    <p className="text-white/25 text-sm max-w-xs">
+                      You haven't sent any gifts yet. Support creators during their live streams!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {gifts.map((gift: any, i: number) => (
+                      <motion.div
+                        key={gift.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.02 }}
+                        className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white/[0.03] transition-all cursor-pointer"
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/10 to-rose-500/10 border border-amber-500/20 flex items-center justify-center text-lg">
+                          {gift.emoji || '🎁'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-white">{gift.giftName || 'Gift'}</p>
+                          <p className="text-[10px] text-white/30">
+                            To {gift.receiverName || 'a creator'} · {gift.createdAt ? new Date(gift.createdAt).toLocaleDateString() : ''}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-amber-400">{(gift.amount ?? 0).toLocaleString()} 🪙</p>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </>
+        )}
+
+        {/* Withdrawals - Under Maintenance */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="rounded-3xl bg-gradient-to-br from-amber-500/5 via-yellow-500/5 to-orange-500/5 border border-amber-500/15 p-5"
+        >
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+              <Ban size={22} className="text-amber-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-base font-bold text-white">Withdrawals</h3>
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-[9px] font-bold text-amber-400 border border-amber-500/20">
+                  Under Maintenance
+                </span>
+              </div>
+              <p className="text-sm text-white/50 leading-relaxed">
+                Withdrawals are temporarily unavailable while we improve our payout infrastructure. 
+                Support for creator withdrawals will be enabled in a future update.
+              </p>
+              <div className="flex items-center gap-3 mt-3">
+                <div className="flex items-center gap-1.5 text-xs text-white/30">
+                  <Clock size={12} />
+                  Estimated completion: Q3 2026
+                </div>
+              </div>
+              <button
+                disabled
+                className="mt-4 px-5 py-2.5 rounded-2xl bg-white/[0.05] border border-white/[0.08] text-white/30 text-sm font-medium cursor-not-allowed"
+              >
+                <ArrowUpRight size={14} className="inline mr-2" />
+                Withdraw (Coming Soon)
+              </button>
             </div>
           </div>
-        )}
+        </motion.div>
+
+        {/* Security Status */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="rounded-3xl bg-white/[0.02] border border-white/[0.06] p-5"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <Shield size={16} className="text-[#00d8ff]" />
+            <h2 className="text-base font-bold text-white">Security</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.04]">
+              <span className="text-xs text-white/50">Wallet Connected</span>
+              <span className="flex items-center gap-1 text-xs text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                {wallet ? 'Active' : 'Inactive'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.04]">
+              <span className="text-xs text-white/50">Network Status</span>
+              <span className="text-xs text-emerald-400">Connected</span>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.04]">
+              <span className="text-xs text-white/50">Two-Factor Auth</span>
+              <span className={cn('text-xs', securityStatus.twoFactor ? 'text-emerald-400' : 'text-amber-400')}>
+                {securityStatus.twoFactor ? 'Enabled' : 'Not Set Up'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.04]">
+              <span className="text-xs text-white/50">Device Verification</span>
+              <span className={cn('text-xs', securityStatus.deviceVerified ? 'text-emerald-400' : 'text-white/30')}>
+                {securityStatus.deviceVerified ? 'Verified' : 'Not Verified'}
+              </span>
+            </div>
+          </div>
+        </motion.div>
       </motion.div>
-    </div>
+
+      {/* Buy Coins Modal */}
+      <BuyCoinsModal
+        open={showBuyModal}
+        onClose={() => setShowBuyModal(false)}
+        onSuccess={handleCoinsPurchased}
+      />
+
+      {/* Gift Modal (placeholder - would open gift store) */}
+      <AnimatePresence>
+        {showGiftModal && (
+          <GiftCoinsModal
+            balance={coinBalance}
+            onClose={() => setShowGiftModal(false)}
+            onSend={async (amount) => {
+              // Would integrate with gift API
+              setShowGiftModal(false);
+              fetchWallet();
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+// Simple Gift Coins Modal
+function GiftCoinsModal({ balance, onClose, onSend }: { balance: number; onClose: () => void; onSend: (amount: number) => Promise<void> }) {
+  const [amount, setAmount] = useState<number>(0);
+  const [recipient, setRecipient] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const presets = [10, 50, 100, 500, 1000];
+
+  const handleSend = async () => {
+    if (amount <= 0 || amount > balance || !recipient) return;
+    setSending(true);
+    await onSend(amount);
+    setSending(false);
+  };
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="fixed inset-4 sm:inset-auto sm:top-[20%] sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-md z-[101] flex flex-col rounded-3xl border border-white/[0.08] bg-[#0e0e16]/95 backdrop-blur-2xl shadow-2xl overflow-hidden"
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+          <h2 className="text-lg font-bold text-white">Gift Coins</h2>
+          <button onClick={onClose} className="rounded-xl p-2 text-gray-400 hover:text-white hover:bg-white/[0.05] transition">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="p-5 space-y-4">
+          <p className="text-xs text-white/50">Your balance: <span className="font-bold text-amber-400">{balance.toLocaleString()} 🪙</span></p>
+          
+          <div>
+            <label className="text-xs font-medium text-white/50 mb-1.5 block">Recipient Username</label>
+            <input
+              value={recipient}
+              onChange={e => setRecipient(e.target.value)}
+              placeholder="@username"
+              className="w-full rounded-2xl border border-white/[0.06] bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-gray-500 outline-none focus:border-[#ff007f]/30 transition-all"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-white/50 mb-1.5 block">Amount</label>
+            <input
+              type="number"
+              value={amount || ''}
+              onChange={e => setAmount(Math.min(Math.max(0, parseInt(e.target.value) || 0), balance))}
+              placeholder="0"
+              className="w-full rounded-2xl border border-white/[0.06] bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-gray-500 outline-none focus:border-[#ff007f]/30 transition-all"
+            />
+            <div className="flex items-center gap-2 mt-2">
+              {presets.map(p => (
+                <button
+                  key={p}
+                  onClick={() => setAmount(Math.min(p, balance))}
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg text-xs font-medium transition-all border',
+                    amount === p ? 'border-[#ff007f]/30 bg-[#ff007f]/10 text-[#ff007f]' : 'border-white/[0.06] text-white/40 hover:text-white'
+                  )}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={handleSend}
+            disabled={amount <= 0 || amount > balance || !recipient || sending}
+            className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-sm font-bold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            {sending ? (
+              <Loader2 size={14} className="animate-spin mx-auto" />
+            ) : (
+              `Send ${amount.toLocaleString()} 🪙`
+            )}
+          </button>
+        </div>
+      </motion.div>
+    </>
   );
 }

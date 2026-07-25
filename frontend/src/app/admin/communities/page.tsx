@@ -7,7 +7,6 @@ import {
   RotateCcw, Shield, Star, Crown, Globe, Lock, Sparkles,
   MoreHorizontal, Eye, EyeOff
 } from 'lucide-react';
-import GlassCard from '@/components/ui/GlassCard';
 import Button from '@/components/ui/Button';
 import { getCommunities } from '@/lib/adminApi';
 import type { CommunityRecord } from '@/types/admin';
@@ -75,13 +74,13 @@ export default function CommunitiesPage() {
       </div>
 
       {/* Search */}
-      <GlassCard>
+      <div className="glass rounded-[var(--radius-2xl)] p-5">
         <div className="flex items-center gap-2 bg-white/5 rounded-2xl px-3 py-1.5 border border-white/[0.06]">
           <Search size={14} className="text-gray-500" />
           <input type="text" placeholder="Search communities..." value={search} onChange={e => setSearch(e.target.value)}
             className="bg-transparent border-none outline-none text-sm text-white placeholder-gray-500 w-full" />
         </div>
-      </GlassCard>
+      </div>
 
       {/* Communities List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

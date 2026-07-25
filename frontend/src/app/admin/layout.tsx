@@ -14,7 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 import Avatar from '@/components/ui/Avatar';
 import Button from '@/components/ui/Button';
 
-const ADMIN_ROLES = ['SUPER_ADMIN', 'ADMINISTRATOR', 'MODERATOR', 'SUPPORT_AGENT', 'FINANCE_MANAGER', 'CONTENT_REVIEWER'];
+const ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN', 'ADMINISTRATOR', 'MODERATOR', 'SUPPORT_AGENT', 'FINANCE_MANAGER', 'CONTENT_REVIEWER'];
 
 interface NavSection {
   label: string;
@@ -31,44 +31,44 @@ const navSections: NavSection[] = [
   {
     label: 'Management',
     items: [
-      { href: '/admin/users', label: 'Users', icon: Users, roles: ['SUPER_ADMIN', 'ADMINISTRATOR', 'MODERATOR', 'SUPPORT_AGENT'] },
-      { href: '/admin/communication', label: 'Communication', icon: Bell, roles: ['SUPER_ADMIN', 'ADMINISTRATOR'] },
-      { href: '/admin/creators', label: 'Creators', icon: UserCog, roles: ['SUPER_ADMIN', 'ADMINISTRATOR', 'MODERATOR', 'CONTENT_REVIEWER'] },
-      { href: '/admin/content', label: 'Content', icon: FileText, roles: ['SUPER_ADMIN', 'ADMINISTRATOR', 'MODERATOR', 'CONTENT_REVIEWER'] },
-      { href: '/admin/live', label: 'Live Streams', icon: Radio, roles: ['SUPER_ADMIN', 'ADMINISTRATOR', 'MODERATOR'] },
+      { href: '/admin/users', label: 'Users', icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'ADMINISTRATOR', 'MODERATOR', 'SUPPORT_AGENT'] },
+      { href: '/admin/communication', label: 'Communication', icon: Bell, roles: ['SUPER_ADMIN', 'ADMIN', 'ADMINISTRATOR'] },
+      { href: '/admin/creators', label: 'Creators', icon: UserCog, roles: ['SUPER_ADMIN', 'ADMIN', 'ADMINISTRATOR', 'MODERATOR', 'CONTENT_REVIEWER'] },
+      { href: '/admin/content', label: 'Content', icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'ADMINISTRATOR', 'MODERATOR', 'CONTENT_REVIEWER'] },
+      { href: '/admin/live', label: 'Live Streams', icon: Radio, roles: ['SUPER_ADMIN', 'ADMIN', 'ADMINISTRATOR', 'MODERATOR'] },
     ],
   },
   {
     label: 'Finance',
     items: [
-      { href: '/admin/finance', label: 'Finance', icon: Wallet, roles: ['SUPER_ADMIN', 'ADMINISTRATOR', 'FINANCE_MANAGER'] },
-      { href: '/admin/gifts', label: 'Gifts', icon: Gift, roles: ['SUPER_ADMIN', 'ADMINISTRATOR', 'FINANCE_MANAGER'] },
+      { href: '/admin/finance', label: 'Finance', icon: Wallet, roles: ['SUPER_ADMIN', 'ADMIN', 'ADMINISTRATOR', 'FINANCE_MANAGER'] },
+      { href: '/admin/gifts', label: 'Gifts', icon: Gift, roles: ['SUPER_ADMIN', 'ADMIN', 'ADMINISTRATOR', 'FINANCE_MANAGER'] },
     ],
   },
   {
     label: 'Community',
     items: [
-      { href: '/admin/communities', label: 'Communities', icon: Building2, roles: ['SUPER_ADMIN', 'ADMINISTRATOR', 'MODERATOR'] },
-      { href: '/admin/notifications', label: 'Notifications', icon: Bell, roles: ['SUPER_ADMIN', 'ADMINISTRATOR'] },
+      { href: '/admin/communities', label: 'Communities', icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'ADMINISTRATOR', 'MODERATOR'] },
+      { href: '/admin/notifications', label: 'Notifications', icon: Bell, roles: ['SUPER_ADMIN', 'ADMIN', 'ADMINISTRATOR'] },
     ],
   },
   {
     label: 'Insights',
     items: [
-      { href: '/admin/analytics', label: 'Analytics', icon: TrendingUp, roles: ['SUPER_ADMIN', 'ADMINISTRATOR', 'FINANCE_MANAGER'] },
-      { href: '/admin/audit', label: 'Audit Logs', icon: ScrollText, roles: ['SUPER_ADMIN', 'ADMINISTRATOR'] },
+      { href: '/admin/analytics', label: 'Analytics', icon: TrendingUp, roles: ['SUPER_ADMIN', 'ADMIN', 'ADMINISTRATOR', 'FINANCE_MANAGER'] },
+      { href: '/admin/audit', label: 'Audit Logs', icon: ScrollText, roles: ['SUPER_ADMIN', 'ADMIN', 'ADMINISTRATOR'] },
     ],
   },
   {
     label: 'Compliance',
     items: [
-      { href: '/admin/compliance', label: 'Compliance', icon: Shield, roles: ['SUPER_ADMIN', 'ADMINISTRATOR', 'MODERATOR', 'CONTENT_REVIEWER'] },
+      { href: '/admin/compliance', label: 'Compliance', icon: Shield, roles: ['SUPER_ADMIN', 'ADMIN', 'ADMINISTRATOR', 'MODERATOR', 'CONTENT_REVIEWER'] },
     ],
   },
   {
     label: 'Infrastructure',
     items: [
-      { href: '/admin/infrastructure', label: 'Infrastructure', icon: Server, roles: ['SUPER_ADMIN', 'ADMINISTRATOR'] },
+      { href: '/admin/infrastructure', label: 'Infrastructure', icon: Server, roles: ['SUPER_ADMIN', 'ADMIN', 'ADMINISTRATOR'] },
     ],
   },
 ];
@@ -119,6 +119,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const roleBadgeColor = (role: string) => {
     const colors: Record<string, string> = {
       SUPER_ADMIN: 'bg-red-500/20 text-red-300',
+      ADMIN: 'bg-purple-500/20 text-purple-300',
       ADMINISTRATOR: 'bg-purple-500/20 text-purple-300',
       MODERATOR: 'bg-blue-500/20 text-blue-300',
       SUPPORT_AGENT: 'bg-green-500/20 text-green-300',

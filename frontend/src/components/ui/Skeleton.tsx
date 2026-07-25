@@ -1,101 +1,68 @@
 'use client';
 
 import React from 'react';
-
-export type SkeletonVariant = 'text' | 'circular' | 'rectangular' | 'card';
+import { cn } from '@/lib/utils';
 
 export interface SkeletonProps {
-  variant?: SkeletonVariant;
+  className?: string;
+  variant?: 'text' | 'circular' | 'rectangular' | 'card';
   width?: string | number;
   height?: string | number;
-  className?: string;
 }
 
-const Skeleton: React.FC<SkeletonProps> = ({
+export default function Skeleton({
+  className,
   variant = 'text',
   width,
   height,
-  className = '',
-}) => {
-  const baseClasses = 'skeleton';
+}: SkeletonProps) {
+  const baseClass = 'bg-white/[0.04] animate-pulse';
 
-  const variantClasses: Record<SkeletonVariant, string> = {
-    text: 'h-3 rounded-md w-full',
+  const variants = {
+    text: 'h-4 w-full rounded-lg',
     circular: 'rounded-full',
     rectangular: 'rounded-xl',
-    card: 'rounded-[28px] w-full h-48',
+    card: 'h-48 rounded-[var(--radius-2xl)]',
   };
-
-  const style: React.CSSProperties = {};
-  if (width) style.width = typeof width === 'number' ? `${width}px` : width;
-  if (height) style.height = typeof height === 'number' ? `${height}px` : height;
 
   return (
     <div
-      className={`${baseClasses} ${variantClasses[variant]} ${className}`}
-      style={style}
+      className={cn(baseClass, variants[variant], className)}
+      style={{ width, height }}
       aria-hidden="true"
     />
   );
-};
+}
 
 export function SkeletonCard() {
   return (
-    <div className="skeleton-card animate-in">
-      <div className="flex items-center gap-4 mb-6">
-        <div className="skeleton rounded-full w-12 h-12" />
+    <div className="glass-card p-5 space-y-4">
+      <div className="flex items-center gap-3">
+        <Skeleton variant="circular" width={40} height={40} />
         <div className="flex-1 space-y-2">
-          <div className="skeleton-line w-1/3" />
-          <div className="skeleton-line w-1/2" />
+          <Skeleton className="w-32" />
+          <Skeleton className="w-20" />
         </div>
       </div>
-      <div className="space-y-2">
-        <div className="skeleton-line" />
-        <div className="skeleton-line w-4/5" />
-        <div className="skeleton-line w-3/5" />
-      </div>
-      <div className="mt-6">
-        <div className="skeleton rounded-2xl h-40 w-full" />
-      </div>
+      <Skeleton variant="text" />
+      <Skeleton variant="text" className="w-3/4" />
+      <Skeleton variant="rectangular" height={200} />
     </div>
   );
 }
 
-export function SkeletonProfile() {
+export function SkeletonList({ count = 3 }: { count?: number }) {
   return (
-    <div className="space-y-6 animate-in">
-      <div className="skeleton rounded-[36px] w-full h-48" />
-      <div className="flex items-center gap-5">
-        <div className="skeleton rounded-full w-20 h-20" />
-        <div className="space-y-2 flex-1">
-          <div className="skeleton-line w-1/4" />
-          <div className="skeleton-line w-1/3" />
-        </div>
-      </div>
-      <div className="space-y-3">
-        <div className="skeleton-line" />
-        <div className="skeleton-line w-3/4" />
-        <div className="skeleton-line w-2/3" />
-      </div>
-    </div>
-  );
-}
-
-export function SkeletonFeed() {
-  return (
-    <div className="space-y-4 animate-in">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="skeleton-card">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="skeleton rounded-full w-10 h-10" />
-            <div className="skeleton-line w-1/4" />
+    <div className="space-y-3">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 p-3">
+          <Skeleton variant="circular" width={36} height={36} />
+          <div className="flex-1 space-y-1.5">
+            <Skeleton className="w-40" />
+            <Skeleton className="w-24" />
           </div>
-          <div className="skeleton rounded-2xl h-48 w-full mb-4" />
-          <div className="skeleton-line w-1/3" />
         </div>
       ))}
     </div>
   );
 }
-
-export default Skeleton;

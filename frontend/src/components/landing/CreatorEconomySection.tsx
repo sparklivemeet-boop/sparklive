@@ -1,16 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Zap, DollarSign, TrendingUp, Users, Gift, Crown } from "lucide-react";
+import { Zap, DollarSign, TrendingUp, Gift, Crown } from "lucide-react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-
-const creatorStats = [
-  { icon: DollarSign, value: "$0", label: "Start earning", color: "from-emerald-500 to-teal-600" },
-  { icon: Users, value: "50K+", label: "Creators", color: "from-blue-500 to-indigo-600" },
-  { icon: Gift, value: "1M+", label: "Gifts sent", color: "from-pink-500 to-rose-600" },
-  { icon: TrendingUp, value: "250%", label: "Avg. growth", color: "from-purple-500 to-violet-600" },
-];
 
 export default function CreatorEconomySection() {
   return (
@@ -51,27 +44,7 @@ export default function CreatorEconomySection() {
           </motion.p>
         </div>
 
-        {/* Stats grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
-          {creatorStats.map((stat, i) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1, duration: 0.5 }}
-              className="rounded-[24px] border border-white/[0.06] bg-white/[0.02] p-6 text-center"
-            >
-              <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${stat.color} flex items-center justify-center mx-auto mb-4`}>
-                <stat.icon size={20} className="text-white" />
-              </div>
-              <p className="text-3xl font-bold text-white mb-1">{stat.value}</p>
-              <p className="text-sm text-white/40">{stat.label}</p>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Feature cards */}
+        {/* Feature cards - no fake stats, just feature descriptions */}
         <div className="grid md:grid-cols-3 gap-4">
           {[
             {
@@ -98,7 +71,7 @@ export default function CreatorEconomySection() {
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: 0.3 + i * 0.1, duration: 0.5 }}
+              transition={{ delay: 0.1 + i * 0.1, duration: 0.5 }}
               className="group rounded-[24px] border border-white/[0.06] bg-white/[0.02] p-6 transition-all duration-300 hover:bg-white/[0.05] hover:border-white/[0.1]"
             >
               <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-4`}>
@@ -114,7 +87,7 @@ export default function CreatorEconomySection() {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ delay: 0.5 }}
+          transition={{ delay: 0.4 }}
           className="text-center mt-10"
         >
           <Link

@@ -1,436 +1,274 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, CheckCircle2, Eye, MessageCircle, Play, Sparkles, StopCircle, UserPlus, Volume2, Search, Users, TrendingUp, Grid, List, Tv, Loader2 } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
-import { apiGet, apiPost, apiPut } from '@/lib/apiClient';
-import { createSocket } from '@/lib/socketClient';
-import { Socket } from 'socket.io-client';
-import Button from '@/components/ui/Button';
-import { SkeletonCard } from '@/components/ui/Skeleton';
-import { formatNumber } from '@/lib/utils';
+import { apiGet } from '@/lib/apiClient';
+import { Radio, TrendingUp, Video, Eye, Loader2, ChevronRight, Clock, Users } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import LiveFeaturedStream from '@/components/live/LiveFeaturedStream';
+import LiveCategoryFilters from '@/components/live/LiveCategoryFilters';
+import LiveStreamCard from '@/components/live/LiveStreamCard';
+import LiveSidebar from '@/components/live/LiveSidebar';
+import FloatingGoLiveButton from '@/components/profile/FloatingGoLiveButton';
+import PremiumGoLiveModal from '@/components/profile/PremiumGoLiveModal';
 
-interface Category { id: string; name: string; description?: string | null; }
-interface LiveStreamItem {
-  id: string; title: string; description?: string | null; category?: Category | null;
-  viewers: number; viewerCount: number; playbackUrl?: string | null; thumbnailUrl?: string | null;
-  active: boolean; host: { id: string; username: string; avatar?: string | null; };
-}
-interface ChatMessage {
-  id: string; message: string; createdAt: string; user: { id: string; username: string; avatar?: string | null; };
-}
-interface StreamDetail extends LiveStreamItem { chatMessages: ChatMessage[]; }
-
-export default function LiveStreamPage() {
-  const { user, token } = useAuth();
-  const [streams, setStreams] = useState<LiveStreamItem[]>([]);
-  const [recommended, setRecommended] = useState<LiveStreamItem[]>([]);
-  const [following, setFollowing] = useState<LiveStreamItem[]>([]);
-  const [categories, setCategories] = useState<string[]>(['All']);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedStream, setSelectedStream] = useState<StreamDetail | null>(null);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [messageDraft, setMessageDraft] = useState('');
-  const [viewerCount, setViewerCount] = useState(0);
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [connectionState, setConnectionState] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
-  const [joinedStreamId, setJoinedStreamId] = useState<string | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState('All');
-  const [followed, setFollowed] = useState(false);
+export default function LivePage() {
+  const { token } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [streams, setStreams] = useState<any[]>([]);
+  const [activeCategory, setActiveCategory] = useState('all');
+  const [goLiveOpen, setGoLiveOpen] = useState(false);
+  const [featuredStream, setFeaturedStream] = useState<any>(null);
 
-  const filteredStreams = useMemo(() => {
-    if (categoryFilter === 'All') return streams;
-    return streams.filter(s => s.category?.name?.toLowerCase() === categoryFilter.toLowerCase());
-  }, [categoryFilter, streams]);
-
-  const scrollChatToBottom = () => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-
-  useEffect(() => {
-    const init = async () => {
-      setLoading(true);
-      try {
-        const [s, r, c, f] = await Promise.all([
-          apiGet<LiveStreamItem[]>('/api/live?limit=30', token || undefined),
-          apiGet<{ streams: LiveStreamItem[] }>('/api/live/discover?limit=8', token || undefined),
-          apiGet<{ name: string }[]>('/api/live/categories', token || undefined),
-          token ? apiGet<{ streams: LiveStreamItem[] }>('/api/live/following', token) : Promise.resolve({ streams: [] }),
-        ]);
-        setStreams(s);
-        if (!selectedId && s.length) setSelectedId(s[0].id);
-        setRecommended(r.streams);
-        setCategories(['All', ...c.map(cat => cat.name || '')]);
-        setFollowing(f.streams);
-      } catch (err) { console.error('Failed to load streams', err); }
-      finally { setLoading(false); }
-    };
-    init();
+  const fetchStreams = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await apiGet<any>('/api/live', token);
+      const list = Array.isArray(data) ? data : data?.items ?? data?.streams ?? [];
+      const streamArray = Array.isArray(list) ? list : [];
+      setStreams(streamArray);
+      
+      // Only set featured stream if real data exists
+      if (streamArray.length > 0) {
+        const first = streamArray[0];
+        setFeaturedStream({
+          id: first.id,
+          title: first.title || 'Live Stream',
+          description: first.description,
+          viewerCount: first.viewerCount || 0,
+          likeCount: first.likeCount || 0,
+          giftCount: first.giftCount || 0,
+          category: first.category || 'General',
+          language: first.language || 'English',
+          quality: first.quality || 'HD',
+          creator: {
+            name: first.host?.fullName || first.host?.username || 'Creator',
+            username: first.host?.username || '@creator',
+            avatar: first.host?.avatar,
+            verified: first.host?.verified || false,
+            level: first.host?.level || 1,
+            followers: first.host?.followersCount || 0,
+          },
+          topSupporters: first.topSupporters || [],
+        });
+      } else {
+        setFeaturedStream(null);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to load streams');
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
 
-  useEffect(() => {
-    if (!selectedId) return;
-    (async () => {
-      try {
-        const stream = await apiGet<StreamDetail>(`/api/live/${selectedId}`, token || undefined);
-        setSelectedStream(stream);
-        setChatMessages(stream.chatMessages.slice().reverse());
-        setViewerCount(stream.viewerCount || stream.viewers || 0);
-        setFollowed(false);
-      } catch { setSelectedStream(null); }
-    })();
-  }, [selectedId, token]);
+  useEffect(() => { fetchStreams(); }, [fetchStreams]);
 
-  useEffect(() => {
-    if (!selectedStream?.id || !token) return;
-    const sc = createSocket(token);
-    setConnectionState('connecting'); sc.connect(); setSocket(sc);
-    sc.on('connect', () => setConnectionState('connected'));
-    sc.on('disconnect', () => { setConnectionState('disconnected'); setJoinedStreamId(null); });
-    sc.on('viewer_count', ({ streamId, viewers }) => { if (streamId === selectedStream.id) setViewerCount(viewers); });
-    sc.on('new_comment', ({ streamId, message }) => { if (streamId === selectedStream.id) setChatMessages(c => [...c, message]); });
-    sc.on('stream_ended', ({ streamId }) => {
-      if (streamId === selectedStream.id) { fetchStreams(); fetchRecommended(); setSelectedStream(c => c ? { ...c, active: false } : c); }
-    });
-    const fetchStreams = async () => { try { const d = await apiGet<LiveStreamItem[]>('/api/live?limit=30', token); setStreams(d); } catch {} };
-    const fetchRecommended = async () => { try { const d = await apiGet<{ streams: LiveStreamItem[] }>('/api/live/discover?limit=8', token); setRecommended(d.streams); } catch {} };
-    sc.on('viewer_joined', ({ streamId }) => { if (streamId === selectedStream.id) setViewerCount(c => c + 1); });
-    sc.on('viewer_left', ({ streamId }) => { if (streamId === selectedStream.id) setViewerCount(c => Math.max(0, c - 1)); });
-    return () => {
-      if (joinedStreamId === selectedStream.id) sc.emit('leave_stream', selectedStream.id);
-      sc.disconnect(); setSocket(null); setConnectionState('disconnected'); setJoinedStreamId(null);
-    };
-  }, [selectedStream?.id, token]);
+  // Filter streams by category - only from real data
+  const filteredStreams = activeCategory === 'all'
+    ? streams
+    : streams.filter(s => s.category?.toLowerCase() === activeCategory);
 
-  useEffect(() => { scrollChatToBottom(); }, [chatMessages]);
-
-  const handleSendMessage = () => {
-    if (!socket || !selectedStream || !messageDraft.trim() || joinedStreamId !== selectedStream.id) return;
-    socket.emit('send_comment', { streamId: selectedStream.id, comment: messageDraft.trim() });
-    setMessageDraft('');
+  const sectionVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: (i: number) => ({
+      opacity: 1, y: 0,
+      transition: { delay: 0.1 + i * 0.05, duration: 0.4, ease: [0.16, 1, 0.3, 1] },
+    }),
   };
 
-  const handleJoinLive = () => {
-    if (!socket || !selectedStream || connectionState !== 'connected') return;
-    socket.emit('join_stream', selectedStream.id);
-    setJoinedStreamId(selectedStream.id);
-  };
-  const isJoined = joinedStreamId === selectedStream?.id;
-  const handleFollow = async () => {
-    if (!selectedStream || !token) return;
-    try { await apiPost(`/api/live/${selectedStream.id}/follow`, {}, token); setFollowed(true); } catch {}
-  };
-  const handleEndStream = async () => {
-    if (!selectedStream || !token) return;
-    try { await apiPut(`/api/live/${selectedStream.id}/end`, {}, token); } catch {}
-  };
-
-  const streamCards = recommended.length ? recommended : filteredStreams.slice(0, 4);
-
-  // Empty state when no streams are available
-  const hasStreams = streams.length > 0 || recommended.length > 0;
-
-  if (loading) return (
-    <div className="min-h-screen pb-24 lg:pb-10">
-      <div className="space-y-6 p-6 max-w-7xl mx-auto">
-        <div className="skeleton rounded-[32px] h-36 w-full" />
-        <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
-          <SkeletonCard /><div className="space-y-4"><SkeletonCard /><SkeletonCard /></div>
-        </div>
-      </div>
-    </div>
-  );
+  // No streams available message
+  const showNoStreams = !loading && streams.length === 0 && !error;
 
   return (
-    <div className="min-h-screen pb-24 lg:pb-10">
-      <div className="space-y-6 max-w-7xl mx-auto p-6">
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        className="max-w-7xl mx-auto space-y-6 pb-24 lg:pb-10"
+      >
         {/* Header */}
-        <div className="glass rounded-[32px] p-6 shadow-card">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.3em] text-gray-400">Live</p>
-              <h1 className="text-3xl font-bold text-white mt-1">Live streams</h1>
-              <p className="text-sm text-gray-400 mt-2 max-w-2xl">Watch live broadcasts, chat in real time, and support your favorite creators.</p>
-            </div>
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-start justify-between"
+        >
+          <div>
             <div className="flex items-center gap-3">
-              <div className="flex rounded-xl border border-white/10 overflow-hidden">
-                <button onClick={() => setViewMode('grid')} className={`p-2.5 transition ${viewMode === 'grid' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white'}`}><Grid size={16} /></button>
-                <button onClick={() => setViewMode('list')} className={`p-2.5 transition ${viewMode === 'list' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white'}`}><List size={16} /></button>
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#ff3366] to-[#ff007f] flex items-center justify-center shadow-lg shadow-[#ff007f]/20">
+                <Radio size={16} className="text-white" />
               </div>
-              <a href="/live/go-live"><Button variant="primary" size="sm" icon={<Play size={14} />}>Go Live</Button></a>
+              <div>
+                <h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight">Live</h1>
+                <p className="text-sm text-white/40">Discover live streams happening now</p>
+              </div>
             </div>
           </div>
-        </div>
+          {streams.length > 0 && (
+            <div className="hidden sm:flex items-center gap-3">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-xs font-medium text-emerald-400">{streams.length} live</span>
+              </div>
+            </div>
+          )}
+        </motion.div>
 
-        {!hasStreams ? (
-          /* Beautiful empty state */
-          <div className="glass rounded-[32px] p-16 text-center shadow-card">
-            <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-6">
-              <Tv size={40} className="text-gray-500" />
+        {/* Loading State */}
+        {loading && streams.length === 0 ? (
+          <div className="space-y-6">
+            <div className="skeleton h-12 w-full rounded-2xl" />
+            <div className="skeleton h-[420px] rounded-3xl" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i}>
+                  <div className="skeleton aspect-video rounded-2xl" />
+                  <div className="mt-3 space-y-2">
+                    <div className="skeleton h-4 w-3/4" />
+                    <div className="skeleton h-3 w-1/2" />
+                  </div>
+                </div>
+              ))}
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2">No live broadcasts at the moment</h2>
-            <p className="text-gray-400 max-w-md mx-auto mb-8">There are no active streams right now. Be the first to go live or check back later.</p>
-            <div className="flex items-center justify-center gap-3">
-              <a href="/live/go-live"><Button variant="primary" size="md" icon={<Play size={16} />}>Start Streaming</Button></a>
-              <a href="/discover"><Button variant="outline" size="md" icon={<Users size={16} />}>Explore Creators</Button></a>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-4">
+              <Loader2 size={24} className="text-red-400" />
             </div>
+            <h3 className="text-white/50 font-medium text-lg mb-1">Failed to load streams</h3>
+            <p className="text-white/30 text-sm mb-4">{error}</p>
+            <button onClick={fetchStreams} className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white text-sm font-bold">
+              Try Again
+            </button>
+          </div>
+        ) : showNoStreams ? (
+          <div className="flex flex-col items-center justify-center py-20 px-4 text-center rounded-3xl bg-white/[0.02] border border-white/[0.04]">
+            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-red-500/10 to-rose-500/10 border border-red-500/15 flex items-center justify-center mb-5">
+              <Radio size={36} className="text-red-400/30" />
+            </div>
+            <h2 className="text-xl font-bold text-white mb-2">No live streams right now</h2>
+            <p className="text-sm text-white/30 max-w-md mb-6">
+              There are no active streams at the moment. Be the first to go live and connect with your audience!
+            </p>
+            <button
+              onClick={() => setGoLiveOpen(true)}
+              className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white text-sm font-bold shadow-lg shadow-[#ff007f]/20 hover:shadow-[#ff007f]/30 transition-all"
+            >
+              <Radio size={14} className="inline mr-2" />
+              Start Your First Stream
+            </button>
+            <button
+              onClick={fetchStreams}
+              className="mt-3 px-4 py-2 rounded-xl text-xs text-white/30 hover:text-white transition-colors"
+            >
+              Refresh
+            </button>
           </div>
         ) : (
-          <div className="grid gap-6 xl:grid-cols-[1.8fr_minmax(0,0.95fr)_320px]">
-            {/* Main Stream Area */}
-            <section className="space-y-6">
-              <div className="glass rounded-[28px] p-5 shadow-card">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.3em] text-gray-400">Now playing</p>
-                    <h2 className="text-2xl font-bold text-white mt-1">{selectedStream?.title || 'Select a live stream'}</h2>
-                  </div>
-                  <div className="inline-flex items-center gap-2 rounded-full bg-white/5 px-4 py-2 text-sm text-gray-300">
-                    <Eye size={16} /> {viewerCount.toLocaleString()} viewers
-                  </div>
-                </div>
-                <div className="mt-4 rounded-[24px] overflow-hidden border border-white/10 bg-black/50 shadow-card">
-                  <div className="relative aspect-[16/9] bg-black">
-                    {selectedStream?.thumbnailUrl ? (
-                      <img src={selectedStream.thumbnailUrl} alt={selectedStream.title} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-950">
-                        <div className="text-center">
-                          <Tv size={48} className="mx-auto mb-3 text-gray-600" />
-                          <p className="text-xs uppercase tracking-[0.3em] text-gray-500">Stream preview</p>
-                        </div>
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,rgba(0,0,0,0.8)_100%)]" />
-                    {selectedStream?.active && (
-                      <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full bg-black/80 px-4 py-2 text-xs uppercase tracking-[0.3em] text-white">
-                        <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" /> Live now
-                      </div>
-                    )}
-                    {selectedStream && (
-                      <div className="absolute right-4 top-4 inline-flex items-center gap-2 rounded-full bg-black/80 px-3 py-1.5 text-xs text-gray-300">
-                        <Users size={12} /> {viewerCount}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {selectedStream && (
-                  <>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <p className="text-[10px] uppercase tracking-[0.25em] text-gray-400">Creator</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <div className="w-8 h-8 rounded-full bg-gradient-spark flex items-center justify-center text-white font-bold text-xs">
-                            {selectedStream.host.username[0].toUpperCase()}
-                          </div>
-                          <p className="text-lg font-semibold text-white">{selectedStream.host.username}</p>
-                        </div>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <p className="text-[10px] uppercase tracking-[0.25em] text-gray-400">Category</p>
-                        <p className="mt-2 text-lg font-semibold text-white">{selectedStream.category?.name || 'Live'}</p>
-                      </div>
-                    </div>
-                    <div className="mt-4 glass rounded-[24px] p-5">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.3em] text-gray-400">Stream actions</p>
-                          <p className="mt-1 text-sm text-gray-300">{selectedStream.description || 'Join the stream to chat, send gifts, and interact live.'}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {user?.id === selectedStream.host.id && selectedStream.active ? (
-                            <Button variant="danger" size="sm" icon={<StopCircle size={16} />} onClick={handleEndStream}>End stream</Button>
-                          ) : selectedStream.active && !isJoined ? (
-                            <Button variant="primary" size="sm" icon={<ArrowRight size={16} />} onClick={handleJoinLive} disabled={connectionState !== 'connected'}>Join Live</Button>
-                          ) : selectedStream.active && isJoined ? (
-                            <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_0_30px_rgba(16,185,129,0.3)]">
-                              <CheckCircle2 size={16} /> Joined
-                            </div>
-                          ) : null}
-                          {!user || user.id !== selectedStream.host.id ? (
-                            <Button variant="outline" size="sm" icon={<UserPlus size={16} />} onClick={handleFollow} disabled={followed}>
-                              {followed ? 'Following' : 'Follow'}
-                            </Button>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </section>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Content */}
+            <div className="lg:col-span-2 space-y-8">
+              {/* Category Filters - only shown when streams exist */}
+              {streams.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.05 }}
+                >
+                  <LiveCategoryFilters
+                    activeCategory={activeCategory}
+                    onCategoryChange={setActiveCategory}
+                  />
+                </motion.div>
+              )}
 
-            {/* Chat */}
-            <section className="space-y-6">
-              <div className="glass rounded-[28px] p-5 shadow-card">
-                <div className="flex items-center justify-between gap-3 mb-4">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.3em] text-gray-400">Live chat</p>
-                    <h2 className="text-lg font-bold text-white">Chat</h2>
+              {/* Featured Stream - only from real data */}
+              {featuredStream && (
+                <motion.div
+                  custom={0}
+                  variants={sectionVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  <LiveFeaturedStream stream={featuredStream} />
+                </motion.div>
+              )}
+
+              {/* Live Streams Grid - only real streams */}
+              <motion.section
+                custom={1}
+                variants={sectionVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Radio size={16} className="text-red-400" />
+                    <h2 className="text-lg font-bold text-white">
+                      {activeCategory === 'all' ? 'All Live Streams' : `${activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1)} Streams`}
+                    </h2>
+                    <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-[10px] font-bold text-red-400 border border-red-500/20">
+                      {filteredStreams.length || streams.length}
+                    </span>
                   </div>
-                  <span className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.2em] ${connectionState === 'connected' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-gray-500/15 text-gray-400'}`}>
-                    {connectionState === 'connected' ? 'Connected' : connectionState === 'connecting' ? 'Connecting...' : 'Disconnected'}
-                  </span>
                 </div>
-                <div className="flex flex-col rounded-[24px] border border-white/10 bg-black/40">
-                  <div className="max-h-[460px] overflow-y-auto px-4 py-4 text-sm text-gray-300 scrollbar-thin">
-                    {!selectedStream ? (
-                      <div className="rounded-2xl border border-dashed border-white/10 bg-black/40 p-6 text-center">
-                        <MessageCircle size={24} className="mx-auto mb-2 text-gray-600" />
-                        <p className="text-gray-500">Select a stream to view chat</p>
-                      </div>
-                    ) : chatMessages.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-white/10 bg-black/40 p-6 text-center">
-                        <MessageCircle size={24} className="mx-auto mb-2 text-gray-600" />
-                        <p className="text-gray-500">No messages yet. Join the stream to chat live.</p>
-                      </div>
-                    ) : chatMessages.map(msg => (
-                      <div key={msg.id} className="mb-3 rounded-2xl border border-white/10 bg-white/5 p-3">
-                        <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
-                          <span className="font-medium text-gray-300">{msg.user.username}</span>
-                          <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                        <p className="mt-1 text-sm text-gray-200">{msg.message}</p>
-                      </div>
+
+                {filteredStreams.length === 0 && streams.length > 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Video size={32} className="text-white/10 mb-3" />
+                    <p className="text-sm text-white/40">No streams in this category</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {(filteredStreams.length > 0 ? filteredStreams : streams).slice(0, 6).map((stream: any, i: number) => (
+                      <LiveStreamCard
+                        key={stream.id}
+                        stream={{
+                          id: stream.id,
+                          title: stream.title || 'Untitled Stream',
+                          thumbnailUrl: stream.thumbnailUrl,
+                          viewerCount: stream.viewerCount || 0,
+                          likeCount: stream.likeCount || 0,
+                          giftCount: stream.giftCount || 0,
+                          category: stream.category || 'General',
+                          language: stream.language,
+                          quality: stream.quality,
+                          duration: stream.duration,
+                          trending: false, // No fake trending data
+                          creator: {
+                            name: stream.host?.fullName || stream.host?.username || 'Creator',
+                            username: stream.host?.username || '@creator',
+                            avatar: stream.host?.avatar,
+                            verified: stream.host?.verified || false,
+                            level: stream.host?.level,
+                          },
+                        }}
+                        index={i}
+                      />
                     ))}
-                    <div ref={chatEndRef} />
                   </div>
-                  <div className="border-t border-white/10 p-3">
-                    <div className="flex gap-2">
-                      <input value={messageDraft} onChange={e => setMessageDraft(e.target.value)} placeholder={isJoined ? "Send a message..." : "Join the stream to chat..."} disabled={!isJoined}
-                        className="flex-1 rounded-2xl border border-white/10 bg-black/40 px-4 py-2 text-sm text-white placeholder-gray-500 outline-none focus:border-[var(--color-spark-pink)] disabled:opacity-50"
-                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }}} />
-                      <Button variant="primary" size="sm" onClick={handleSendMessage} disabled={!messageDraft.trim() || !socket || !isJoined}>
-                        <MessageCircle size={16} />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="glass rounded-[28px] p-5 shadow-card">
-                <p className="text-[11px] uppercase tracking-[0.3em] text-gray-400 mb-4">Recommended channels</p>
-                <div className="space-y-3">
-                  {streamCards.map(stream => (
-                    <button key={stream.id} onClick={() => setSelectedId(stream.id)} className={`w-full rounded-2xl border p-3 text-left transition ${selectedStream?.id === stream.id ? 'border-[var(--color-spark-pink)]/30 bg-white/10' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-spark flex items-center justify-center text-white font-bold text-sm">{stream.host.username[0].toUpperCase()}</div>
-                        <div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{stream.title}</p><p className="truncate text-xs text-gray-400">{stream.host.username}</p></div>
-                      </div>
-                      <div className="mt-2 flex items-center justify-between text-xs text-gray-400">
-                        <span>{stream.category?.name || 'Live'}</span>
-                        <span>{(stream.viewers ?? stream.viewerCount ?? 0).toLocaleString()} viewers</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </section>
+                )}
+              </motion.section>
+            </div>
 
-            {/* Sidebar */}
-            <aside className="hidden xl:block space-y-6">
-              <div className="glass rounded-[28px] p-5 shadow-card">
-                <p className="text-[11px] uppercase tracking-[0.3em] text-gray-400 mb-4">Categories</p>
-                <div className="space-y-2">
-                  {categories.map(cat => (
-                    <button key={cat} onClick={() => setCategoryFilter(cat)}
-                      className={`w-full rounded-2xl px-4 py-2.5 text-left text-sm transition ${categoryFilter === cat ? 'bg-gradient-spark text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10'}`}>
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="glass rounded-[28px] p-5 shadow-card">
-                <p className="text-[11px] uppercase tracking-[0.3em] text-gray-400 mb-4">Following</p>
-                <div className="space-y-2">
-                  {following.length ? following.map(stream => (
-                    <button key={stream.id} onClick={() => setSelectedId(stream.id)} className="w-full rounded-2xl border border-white/10 bg-black/40 px-3 py-2.5 text-left text-sm text-gray-200 hover:bg-white/5 transition">
-                      <p className="font-semibold text-white">{stream.host.username}</p>
-                      <p className="text-xs text-gray-400">{stream.title}</p>
-                    </button>
-                  )) : <div className="rounded-2xl border border-dashed border-white/10 bg-black/40 p-4 text-sm text-gray-500 text-center">Follow streamers to see their live rooms here.</div>}
-                </div>
-              </div>
-              {/* Stats overview */}
-              <div className="glass rounded-[28px] p-5 shadow-card">
-                <p className="text-[11px] uppercase tracking-[0.3em] text-gray-400 mb-4">Overview</p>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">Live now</span>
-                    <span className="text-white font-semibold">{streams.filter(s => s.active).length}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">Categories</span>
-                    <span className="text-white font-semibold">{categories.length - 1}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">Total viewers</span>
-                    <span className="text-white font-semibold">{streams.reduce((acc, s) => acc + (s.viewers ?? s.viewerCount ?? 0), 0).toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-            </aside>
-          </div>
-        )}
-
-        {/* Browse all streams section */}
-        {hasStreams && (
-          <div className="glass rounded-[28px] p-5 shadow-card">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.3em] text-gray-400">Browse</p>
-                <h2 className="text-xl font-bold text-white">All live streams</h2>
-              </div>
-              <div className="flex gap-2 overflow-x-auto">
-                {categories.slice(0, 6).map(cat => (
-                  <button key={cat} onClick={() => setCategoryFilter(cat)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition ${categoryFilter === cat ? 'bg-gradient-spark text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}>
-                    {cat}
-                  </button>
-                ))}
+            {/* Right Sidebar */}
+            <div className="hidden lg:block">
+              <div className="sticky top-24">
+                <LiveSidebar />
               </div>
             </div>
-            {filteredStreams.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <p className="text-sm">No streams in this category.</p>
-              </div>
-            ) : (
-              <div className={viewMode === 'grid' ? 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'space-y-3'}>
-                {filteredStreams.map(stream => (
-                  viewMode === 'grid' ? (
-                    <button key={stream.id} onClick={() => setSelectedId(stream.id)}
-                      className="rounded-2xl border border-white/10 bg-black/40 overflow-hidden text-left transition hover:border-white/20 hover:bg-white/5">
-                      <div className="relative aspect-video bg-gray-900">
-                        {stream.thumbnailUrl ? <img src={stream.thumbnailUrl} alt={stream.title} className="w-full h-full object-cover" /> :
-                          <div className="flex items-center justify-center h-full"><Tv size={24} className="text-gray-700" /></div>}
-                        {stream.active && <div className="absolute top-2 left-2 rounded-full bg-rose-500 px-2 py-0.5 text-[9px] font-semibold text-white flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />LIVE</div>}
-                        <div className="absolute top-2 right-2 rounded-full bg-black/70 px-2 py-0.5 text-[9px] text-gray-300 flex items-center gap-1"><Eye size={10} />{(stream.viewers ?? stream.viewerCount ?? 0).toLocaleString()}</div>
-                      </div>
-                      <div className="p-3">
-                        <p className="text-sm font-semibold text-white truncate">{stream.title}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{stream.host.username}</p>
-                      </div>
-                    </button>
-                  ) : (
-                    <button key={stream.id} onClick={() => setSelectedId(stream.id)}
-                      className="w-full rounded-2xl border border-white/10 bg-black/40 p-3 text-left transition hover:bg-white/5 flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-spark flex items-center justify-center text-white font-bold shrink-0">{stream.host.username[0].toUpperCase()}</div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-white">{stream.title}</p>
-                        <p className="text-xs text-gray-400">{stream.host.username} · {stream.category?.name || 'Live'}</p>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <Eye size={12} /> {(stream.viewers ?? stream.viewerCount ?? 0).toLocaleString()}
-                        {stream.active && <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />}
-                      </div>
-                    </button>
-                  )
-                ))}
-              </div>
-            )}
           </div>
         )}
-      </div>
-    </div>
+      </motion.div>
+
+      {/* Floating Go Live */}
+      <FloatingGoLiveButton onClick={() => setGoLiveOpen(true)} />
+      <PremiumGoLiveModal open={goLiveOpen} onClose={() => setGoLiveOpen(false)} />
+    </>
   );
 }

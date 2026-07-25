@@ -1,103 +1,87 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from 'react';
-import { Heart, UserPlus, MessageCircle, Gift, Radio, Wallet, Bell, CheckCheck, Trash2 } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
-import { apiGet, apiPut, apiDelete } from '@/lib/apiClient';
+import { apiGet, apiPost } from '@/lib/apiClient';
+import { Bell, Heart, MessageCircle, UserPlus, Radio, Gift, Loader2, Settings, Check, X, Sparkles, TrendingUp, Calendar, Star, MoreHorizontal, ChevronRight, Clock } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import Avatar from '@/components/ui/Avatar';
 import { formatTimeAgo } from '@/lib/utils';
+import Link from 'next/link';
 
-const notificationIcons: Record<string, any> = {
-  like: Heart,
-  follow: UserPlus,
-  comment: MessageCircle,
-  gift: Gift,
-  live: Radio,
-  message: MessageCircle,
-  wallet: Wallet,
-  system: Bell,
-};
-
-const notificationColors: Record<string, string> = {
-  like: 'text-rose-400 bg-rose-500/10',
-  follow: 'text-blue-400 bg-blue-500/10',
-  comment: 'text-cyan-400 bg-cyan-500/10',
-  gift: 'text-amber-400 bg-amber-500/10',
-  live: 'text-red-400 bg-red-500/10',
-  message: 'text-purple-400 bg-purple-500/10',
-  wallet: 'text-emerald-400 bg-emerald-500/10',
-  system: 'text-gray-400 bg-gray-500/10',
+const notificationConfig: Record<string, { icon: any; color: string; gradient: string }> = {
+  like: { icon: Heart, color: 'text-pink-400', gradient: 'from-pink-500/20 to-pink-500/10' },
+  follow: { icon: UserPlus, color: 'text-emerald-400', gradient: 'from-emerald-500/20 to-emerald-500/10' },
+  comment: { icon: MessageCircle, color: 'text-blue-400', gradient: 'from-blue-500/20 to-blue-500/10' },
+  stream: { icon: Radio, color: 'text-purple-400', gradient: 'from-purple-500/20 to-purple-500/10' },
+  gift: { icon: Gift, color: 'text-amber-400', gradient: 'from-amber-500/20 to-amber-500/10' },
+  message: { icon: MessageCircle, color: 'text-cyan-400', gradient: 'from-cyan-500/20 to-cyan-500/10' },
+  mention: { icon: Bell, color: 'text-[#ff007f]', gradient: 'from-[#ff007f]/20 to-[#7a00cc]/20' },
+  milestone: { icon: Star, color: 'text-amber-400', gradient: 'from-amber-500/20 to-orange-500/20' },
 };
 
 export default function NotificationsPage() {
   const { token } = useAuth();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState('all');
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [markingAll, setMarkingAll] = useState(false);
 
-  useEffect(() => {
+  const fetchNotifications = useCallback(async () => {
     if (!token) return;
-    const fetchData = async () => {
-      try {
-        const data = await apiGet<any>('/api/notifications', token);
-        setNotifications(data.items || []);
-      } catch (error) {
-        console.error('Failed to fetch notifications', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await apiGet<any>('/api/notifications', token);
+      const list = Array.isArray(data) ? data : data?.notifications ?? data?.data ?? [];
+      setNotifications(Array.isArray(list) ? list : []);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load notifications');
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
 
-  const handleMarkAllRead = async () => {
+  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
+
+  const markAllRead = async () => {
     if (!token) return;
+    setMarkingAll(true);
     try {
-      await apiPut('/api/notifications/read-all', {}, token);
+      await apiPost('/api/notifications/read-all', {}, token);
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    } catch (error) {
-      console.error('Failed to mark all as read', error);
-    }
+    } catch {}
+    setMarkingAll(false);
   };
 
-  const handleMarkRead = async (id: string) => {
+  const markRead = async (id: string) => {
     if (!token) return;
     try {
-      await apiPut(`/api/notifications/${id}/read`, {}, token);
+      await apiPost(`/api/notifications/${id}/read`, {}, token);
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-    } catch (error) {
-      console.error('Failed to mark notification as read', error);
-    }
+    } catch {}
   };
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!token) return;
-    try {
-      await apiDelete(`/api/notifications/${id}`, token);
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    } catch (error) {
-      console.error('Failed to delete notification', error);
-    }
-  };
+  const filtered = filter === 'unread' ? notifications.filter(n => !n.read) : notifications;
+  const unreadCount = notifications.filter(n => !n.read).length;
 
-  const filteredNotifications = activeFilter === 'all'
-    ? notifications
-    : activeFilter === 'unread'
-      ? notifications.filter(n => !n.read)
-      : notifications.filter(n => n.type === activeFilter);
+  const pinnedNotifications = notifications.filter((n: any) => n.pinned || (n.type === 'milestone'));
+  const normalNotifications = filtered.filter((n: any) => !n.pinned && n.type !== 'milestone');
 
   if (loading) {
     return (
-      <div className="min-h-screen pb-24 lg:pb-10">
-        <div className="space-y-4">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="glass rounded-[24px] p-5 animate-pulse">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-white/10" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-white/10 rounded w-3/4" />
-                  <div className="h-3 bg-white/10 rounded w-1/2" />
-                </div>
+      <div className="max-w-2xl mx-auto space-y-4">
+        <div className="skeleton h-8 w-40" />
+        <div className="skeleton h-12 w-full rounded-2xl" />
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="flex items-center gap-4 p-4">
+              <div className="skeleton w-10 h-10 rounded-xl" />
+              <div className="flex-1 space-y-2">
+                <div className="skeleton h-4 w-3/4" />
+                <div className="skeleton h-3 w-1/2" />
               </div>
             </div>
           ))}
@@ -106,71 +90,195 @@ export default function NotificationsPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="max-w-2xl mx-auto flex flex-col items-center justify-center py-24">
+        <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-4">
+          <Loader2 size={24} className="text-red-400" />
+        </div>
+        <h2 className="text-lg font-medium text-white/60 mb-2">Failed to load notifications</h2>
+        <p className="text-sm text-white/30 mb-6">{error}</p>
+        <button onClick={fetchNotifications} className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white text-sm font-bold">
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen pb-24 lg:pb-10">
-      <div className="space-y-6">
-        <div className="glass rounded-[32px] p-6 shadow-card">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.3em] text-gray-400">Inbox</p>
-              <h1 className="text-3xl lg:text-4xl font-bold text-white">Notifications</h1>
-              <p className="text-sm text-gray-400 mt-2">Stay updated with your activity and community interactions.</p>
-            </div>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="max-w-2xl mx-auto space-y-6 pb-24 lg:pb-10"
+    >
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-between"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#ff007f] to-[#7a00cc] flex items-center justify-center shadow-lg shadow-[#ff007f]/20">
+            <Bell size={16} className="text-white" />
+          </div>
+          <div>
             <div className="flex items-center gap-2">
-              <button onClick={handleMarkAllRead} className="flex items-center gap-2 rounded-full bg-white/5 px-4 py-2 text-xs text-gray-400 hover:bg-white/10 hover:text-white transition">
-                <CheckCheck size={14} /> Mark all read
-              </button>
+              <h1 className="text-2xl font-bold text-white">Notifications</h1>
+              {unreadCount > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-[9px] font-bold text-white">
+                  {unreadCount}
+                </span>
+              )}
             </div>
+            <p className="text-sm text-white/40">Stay updated with your activity</p>
           </div>
         </div>
+        <Link href="/settings/notifications" className="p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-gray-400 hover:text-white hover:bg-white/[0.08] transition-all">
+          <Settings size={15} />
+        </Link>
+      </motion.div>
 
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
-          {['all', 'unread', 'like', 'follow', 'comment', 'gift', 'live', 'message', 'wallet', 'system'].map((filter) => (
-            <button key={filter} onClick={() => setActiveFilter(filter)}
-              className={`rounded-full px-4 py-2 text-xs font-medium whitespace-nowrap transition-all ${
-                activeFilter === filter ? 'bg-gradient-spark text-white shadow-[0_0_20px_rgba(255,0,127,0.2)]' : 'bg-white/5 text-gray-400 hover:bg-white/10'
-              }`}>
-              {filter.charAt(0).toUpperCase() + filter.slice(1)}
+      {/* Filters & Actions */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="flex items-center justify-between"
+      >
+        <div className="flex items-center gap-1 bg-white/[0.04] rounded-xl p-1">
+          {(['all', 'unread'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={cn(
+                'px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all',
+                filter === f ? 'bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white' : 'text-gray-500 hover:text-white'
+              )}
+            >
+              {f === 'all' ? 'All' : 'Unread'}
+              {f === 'unread' && unreadCount > 0 && (
+                <span className="ml-1 text-[9px] opacity-70">({unreadCount})</span>
+              )}
             </button>
           ))}
         </div>
+        {unreadCount > 0 && (
+          <button
+            onClick={markAllRead}
+            disabled={markingAll}
+            className="flex items-center gap-1.5 text-[10px] text-[#00d8ff] hover:text-[#06f7ff] transition-colors"
+          >
+            {markingAll ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
+            Mark all read
+          </button>
+        )}
+      </motion.div>
 
-        {filteredNotifications.length === 0 ? (
-          <div className="glass rounded-[32px] p-12 text-center text-gray-500">
-            <Bell size={48} className="mx-auto mb-4 opacity-30" />
-            <p className="text-lg font-medium">No notifications</p>
-            <p className="text-sm mt-2">You're all caught up!</p>
+      {/* Notification List */}
+      {notifications.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 px-4 text-center rounded-3xl bg-white/[0.02] border border-white/[0.04]">
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#ff007f]/10 to-[#7a00cc]/10 border border-[#ff007f]/15 flex items-center justify-center mb-5">
+            <Bell size={36} className="text-[#ff007f]/30" />
           </div>
-        ) : (
-          <div className="space-y-3">
-            {filteredNotifications.map((notification: any) => {
-              const Icon = notificationIcons[notification.type] || Bell;
-              const colorClass = notificationColors[notification.type] || 'text-gray-400 bg-gray-500/10';
-              return (
-                <div key={notification.id} onClick={() => handleMarkRead(notification.id)}
-                  className={`glass rounded-[20px] p-4 transition-all hover:bg-white/[0.06] cursor-pointer ${
-                    !notification.read ? 'border-l-2 border-[#ff007f]' : ''
-                  }`}>
-                  <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${colorClass}`}>
-                      <Icon size={18} />
+          <h3 className="text-lg font-bold text-white mb-1">No notifications yet</h3>
+          <p className="text-sm text-white/30 max-w-sm">
+            When someone likes your content, follows you, or sends you a gift, you'll see it here.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-0.5">
+          {/* Pinned / Milestones */}
+          {pinnedNotifications.map((notif: any, i: number) => {
+            const config = notificationConfig[notif.type] || { icon: Bell, color: 'text-white/40', gradient: 'from-white/[0.04] to-white/[0.02]' };
+            const Icon = config.icon;
+            return (
+              <motion.div
+                key={notif.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.03 }}
+                className={cn(
+                  'flex items-start gap-4 p-4 rounded-2xl bg-gradient-to-br border transition-all duration-200 cursor-pointer group',
+                  !notif.read
+                    ? 'bg-gradient-to-r from-[#ff007f]/5 to-[#7a00cc]/5 border-[#ff007f]/10'
+                    : 'border-transparent hover:bg-white/[0.02]'
+                )}
+                onClick={() => !notif.read && markRead(notif.id)}
+              >
+                <div className={cn('w-10 h-10 rounded-xl bg-gradient-to-br border border-white/[0.06] flex items-center justify-center shrink-0', config.gradient)}>
+                  <Icon size={16} className={config.color} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-white/80 leading-relaxed">
+                    {notif.message || notif.title || 'New notification'}
+                  </p>
+                  <p className="text-[10px] text-white/30 mt-1 flex items-center gap-1">
+                    <Clock size={10} />
+                    {formatTimeAgo(notif.createdAt)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {!notif.read && (
+                    <span className="w-2 h-2 rounded-full bg-gradient-to-r from-[#ff007f] to-[#7a00cc]" />
+                  )}
+                  <button className="p-1.5 rounded-lg text-white/10 hover:text-white/40 transition opacity-0 group-hover:opacity-100">
+                    <MoreHorizontal size={12} />
+                  </button>
+                </div>
+              </motion.div>
+            );
+          })}
+
+          {/* Normal Notifications */}
+          {normalNotifications.length > 0 && (
+            <>
+              {pinnedNotifications.length > 0 && (
+                <div className="h-2" />
+              )}
+              {normalNotifications.map((notif: any, i: number) => {
+                const config = notificationConfig[notif.type] || { icon: Bell, color: 'text-white/40', gradient: 'from-white/[0.04] to-white/[0.02]' };
+                const Icon = config.icon;
+                return (
+                  <motion.div
+                    key={notif.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.02 }}
+                    className={cn(
+                      'flex items-start gap-4 p-4 rounded-2xl transition-all duration-200 cursor-pointer group',
+                      !notif.read
+                        ? 'bg-white/[0.03] border border-white/[0.06]'
+                        : 'hover:bg-white/[0.02] border border-transparent'
+                    )}
+                    onClick={() => !notif.read && markRead(notif.id)}
+                  >
+                    <div className={cn('w-10 h-10 rounded-xl bg-gradient-to-br border border-white/[0.06] flex items-center justify-center shrink-0', config.gradient)}>
+                      <Icon size={16} className={config.color} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white">{notification.title}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{notification.body}</p>
-                      <p className="text-[10px] text-gray-600 mt-1">{formatTimeAgo(notification.createdAt)}</p>
+                      <p className="text-sm text-white/70 leading-relaxed">
+                        {notif.message || notif.title || 'New notification'}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] text-white/30">{formatTimeAgo(notif.createdAt)}</span>
+                        {notif.type === 'stream' && (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-500/10 text-[8px] font-bold text-red-400">LIVE</span>
+                        )}
+                      </div>
                     </div>
-                    <button onClick={(e) => handleDelete(notification.id, e)}
-                      className="p-2 text-gray-500 hover:text-red-400 transition">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {!notif.read && (
+                        <span className="w-2 h-2 rounded-full bg-gradient-to-r from-[#ff007f] to-[#7a00cc]" />
+                      )}
+                      <ChevronRight size={12} className="text-white/10 group-hover:text-white/30 transition-colors" />
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </>
+          )}
+        </div>
+      )}
+    </motion.div>
   );
 }

@@ -45,7 +45,7 @@ export class LiveService {
     }, CACHE_TTL.SHORT); // Short TTL for live data
   }
 
-  async createStream(hostId: string, title: string, description?: string, categoryName?: string) {
+  async startStream(hostId: string, title: string, description?: string, categoryName?: string) {
     const stream = await prisma.liveStream.create({
       data: { hostId, title, description: description || '', categoryName },
       include: {

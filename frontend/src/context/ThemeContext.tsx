@@ -19,13 +19,26 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const [theme, setThemeState] = useState<Theme>('dark');
   const [mounted, setMounted] = useState(false);
 
+  // Sync theme with DOM as early as possible to prevent flash
   useEffect(() => {
+    const applyTheme = (t: Theme) => {
+      const root = document.documentElement;
+      if (t === 'light') {
+        root.classList.remove('dark');
+        root.classList.add('light');
+      } else {
+        root.classList.remove('light');
+        root.classList.add('dark');
+      }
+      storage.setItem(THEME_KEY, t);
+    };
+
     setMounted(true);
     const loadTheme = async () => {
       const stored = await storage.getItem(THEME_KEY);
-      if (stored === 'light' || stored === 'dark') {
-        setThemeState(stored);
-      }
+      const resolved = stored === 'light' || stored === 'dark' ? stored : 'dark';
+      setThemeState(resolved);
+      applyTheme(resolved);
     };
     loadTheme();
   }, []);
@@ -40,7 +53,6 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
       root.classList.remove('light');
       root.classList.add('dark');
     }
-    storage.setItem(THEME_KEY, theme);
   }, [theme, mounted]);
 
   const toggleTheme = useCallback(() => {

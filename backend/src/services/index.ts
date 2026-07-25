@@ -32,3 +32,9 @@ export { analyticsEventsService, AnalyticsEventsService } from "./analytics-even
 
 // Compliance & Privacy services
 export { complianceService, ComplianceService } from "./compliance.service";
+
+// Match/Discovery service
+export { matchService, MatchService } from "./match.service";
+
+// Verification & Creator Membership service
+export { verificationService, VerificationService } from "./verification.service";

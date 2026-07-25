@@ -119,6 +119,13 @@ model User {
   welcomeReward    WelcomeReward?
   coinTransactions CoinTransaction[]
 
+  // Verification & Creator Membership
+  verificationBadge    VerificationBadge?
+  verificationRequest  VerificationRequest?
+  creatorMembership    CreatorMembership?
+  cryptoPayments       CryptoPayment[]
+  verificationHistory  VerificationHistory[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -2165,4 +2172,130 @@ model ARPUAnalytics {
 
   @@unique([date, period])
   @@index([date, period])
+}
+
+// ==========================================
+// VERIFICATION & CREATOR MEMBERSHIP SYSTEM
+// ==========================================
+
+/// VerificationBadge: Tracks blue/gold badges per user
+model VerificationBadge {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badgeType   String    // BLUE or GOLD
+  status      String    @default("ACTIVE") // ACTIVE, REVOKED, SUSPENDED, EXPIRED
+  grantedBy   String?
+  grantedAt   DateTime  @default(now())
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  revokedBy   String?
+  revokeReason String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId, status])
+  @@index([badgeType, status])
+}
+
+/// VerificationRequest: Tracks user verification requests
+model VerificationRequest {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestType     String    // CREATOR, BUSINESS, INDIVIDUAL
+  status          String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  documents       String?
+  notes           String?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId, status])
+}
+
+/// SubscriptionPlan: Configurable creator membership plans
+model SubscriptionPlan {
+  id              String    @id @default(cuid())
+  name            String    @unique
+  durationMonths  Int
+  price           Float
+  currency        String    @default("USD")
+  description     String?
+  benefits        String?   // JSON array of benefit strings
+  isActive        Boolean   @default(true)
+  sortOrder       Int       @default(0)
+  badgeType       String    @default("GOLD")
+  memberships     CreatorMembership[]
+  cryptoPayments  CryptoPayment[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
+/// CreatorMembership: Tracks active creator subscriptions
+model CreatorMembership {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId        String
+  plan          SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  status        String    @default("ACTIVE") // ACTIVE, EXPIRED, CANCELLED, SUSPENDED
+  startDate     DateTime  @default(now())
+  endDate       DateTime
+  renewalDate   DateTime?
+  autoRenew     Boolean   @default(false)
+  cancelledAt   DateTime?
+  paymentMethod String?
+  paymentTxHash String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId, status])
+  @@index([status, endDate])
+  @@index([endDate])
+}
+
+/// CryptoPayment: Tracks crypto payment transactions
+model CryptoPayment {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId        String
+  plan          SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  amount        Float
+  currency      String    // USDT, USDC
+  network       String    // BNB_SMART_CHAIN, BASE
+  walletAddress String
+  txHash        String?   @unique
+  status        String    @default("PENDING") // PENDING, CONFIRMED, FAILED, EXPIRED
+  confirmations Int       @default(0)
+  expiresAt     DateTime
+  confirmedAt   DateTime?
+  metadata      String?   // JSON
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@index([txHash])
+  @@index([expiresAt])
+}
+
+/// VerificationHistory: Audit log for verification actions
+model VerificationHistory {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action      String
+  performedBy String?
+  details     String?   // JSON
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
 }

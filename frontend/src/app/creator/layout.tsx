@@ -8,11 +8,14 @@ import {
   Home, FileText, Radio, DollarSign, Crown, Users, BarChart3,
   MessageCircle, Wallet, Bell, Sparkles, Shield, ChevronLeft,
   ChevronRight, Menu, LogOut, Search, Settings, Activity,
-  Video, Lightbulb
+  Video, Lightbulb, Loader2, ArrowUpRight
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import Avatar from '@/components/ui/Avatar';
 import GlassCard from '@/components/ui/GlassCard';
+import VerificationBadge from '@/components/ui/VerificationBadge';
+import { checkStudioAccess } from '@/lib/verificationApi';
+import type { VerificationStatus } from '@/lib/verificationApi';
 
 interface NavItem {
   href: string;
@@ -77,8 +80,42 @@ export default function CreatorLayout({ children }: { children: React.ReactNode 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState<VerificationStatus | null>(null);
+  const [checkingAccess, setCheckingAccess] = useState(true);
 
   useEffect(() => { setMobileOpen(false); }, [pathname]);
+
+  // Check creator studio access on every route change
+  useEffect(() => {
+    if (!token || !pathname) {
+      setCheckingAccess(false);
+      return;
+    }
+    
+    // Skip access check for the upgrade page itself
+    if (pathname === '/creator/upgrade') {
+      setCheckingAccess(false);
+      return;
+    }
+
+    const verifyAccess = async () => {
+      setCheckingAccess(true);
+      try {
+        const access = await checkStudioAccess(token);
+        setVerificationStatus(access.status);
+        if (!access.allowed) {
+          router.push('/creator/upgrade');
+        }
+      } catch {
+        // If API fails, allow access (degraded mode)
+        setCheckingAccess(false);
+      } finally {
+        setCheckingAccess(false);
+      }
+    };
+
+    verifyAccess();
+  }, [token, pathname, router]);
 
   const isCreator = user?.role === 'creator' || user?.role === 'admin' || user?.role === 'moderator';
 

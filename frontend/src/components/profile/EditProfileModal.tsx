@@ -207,25 +207,64 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
     if (bannerInputRef.current) bannerInputRef.current.value = '';
   };
 
+  // Upload file using direct fetch with FormData (POST, matches backend multer config)
+  const uploadFile = async (file: File, path: string, fieldName: string): Promise<string | undefined> => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const url = `${apiUrl}${path}`;
+      const formData = new FormData();
+      formData.append(fieldName, file);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || result.message || 'Upload failed');
+      }
+      
+      // Backend returns: { message, profile, url }
+      return result?.url || result?.data?.url || undefined;
+    } catch (err) {
+      console.error(`Upload failed for ${path}:`, err);
+      return undefined;
+    }
+  };
+
   const handleSave = async () => {
     if (!token) return;
     setSaving(true);
     setError(null);
     try {
-      // Upload avatar if changed
+      // Upload avatar if changed - field name 'avatar' matches backend multer config
       if (avatarFile) {
-        const fd = new FormData();
-        fd.append('avatar', avatarFile);
-        await apiUpload('/api/profiles/me/avatar', fd, token);
+        const avatarUrl = await uploadFile(avatarFile, '/api/profiles/me/avatar', 'avatar');
+        if (avatarUrl) {
+          setAvatarPreview(avatarUrl);
+        } else {
+          setError('Failed to upload avatar. Please try again.');
+          setSaving(false);
+          return;
+        }
       }
-      // Upload banner if changed
+      // Upload banner if changed - field name 'banner' matches backend multer config
       if (bannerFile) {
-        const fd = new FormData();
-        fd.append('banner', bannerFile);
-        await apiUpload('/api/profiles/me/banner', fd, token);
+        const bannerUrl = await uploadFile(bannerFile, '/api/profiles/me/banner', 'banner');
+        if (bannerUrl) {
+          setBannerPreview(bannerUrl);
+        } else {
+          setError('Failed to upload banner. Please try again.');
+          setSaving(false);
+          return;
+        }
       }
       // Update profile data
-      const updated = await apiPut('/api/profiles/me', {
+      const updated = await apiPut<any>('/api/profiles/me', {
         fullName: form.fullName,
         username: form.username,
         bio: form.bio,

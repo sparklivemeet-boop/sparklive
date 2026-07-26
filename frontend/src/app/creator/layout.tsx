@@ -156,8 +156,9 @@ export default function CreatorLayout({ children }: { children: React.ReactNode 
       <aside className={`fixed lg:sticky top-0 left-0 h-screen z-50 transition-all duration-300 ease-in-out ${sidebarOpen ? 'w-[260px]' : 'w-[72px]'} ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} glass-strong border-r border-white/[0.06] flex flex-col`}>
         <div className="flex items-center justify-between px-4 h-16 border-b border-white/[0.06]">
           <Link href="/creator" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
-              <Sparkles size={16} className="text-white" />
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/branding/sparklive-logo.png" alt="SparkLive" width={18} height={18} className="object-contain" style={{ width: 18, height: 18 }} />
             </div>
             {sidebarOpen && <span className="font-bold text-white text-sm tracking-tight">SparkLive <span className="text-pink-400">Studio</span></span>}
           </Link>

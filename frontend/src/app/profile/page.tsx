@@ -14,6 +14,7 @@ import EditProfileModal from '@/components/profile/EditProfileModal';
 import PremiumGoLiveModal from '@/components/profile/PremiumGoLiveModal';
 import FloatingGoLiveButton from '@/components/profile/FloatingGoLiveButton';
 import { uploadAvatar as uploadAvatarService, uploadBanner as uploadBannerService, validateUploadFile } from '@/lib/uploadService';
+import { Sparkles, Zap, Trophy, Crown, Activity, Target, TrendingUp, Eye } from 'lucide-react';
 
 export default function ProfilePage() {
   const { token, user } = useAuth();
@@ -23,6 +24,7 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('posts');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [isLive, setIsLive] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [goLiveModalOpen, setGoLiveModalOpen] = useState(false);
@@ -48,6 +50,17 @@ export default function ProfilePage() {
     badges: [] as any[],
     achievements: [] as any[],
     creatorRank: null as any,
+    recentActivity: [] as any[],
+    upcomingStreams: [] as any[],
+    topDonors: [] as any[],
+  });
+
+  // Additional profile metrics
+  const [metrics, setMetrics] = useState({
+    totalViews: 0,
+    totalWatchTime: '0h',
+    engagement: 0,
+    rank: 0,
   });
 
   // Fetch profile data
@@ -65,6 +78,14 @@ export default function ProfilePage() {
         shorts: profileData.shortsCount ?? profileData.shorts_count ?? 0,
         followers: profileData.followersCount ?? profileData.followers_count ?? 0,
         following: profileData.followingCount ?? profileData.following_count ?? 0,
+      });
+
+      // Metrics
+      setMetrics({
+        totalViews: profileData.totalViews ?? profileData.total_views ?? 0,
+        totalWatchTime: profileData.totalWatchTime ?? profileData.total_watch_time ?? '0h',
+        engagement: profileData.engagement ?? 0,
+        rank: profileData.rank ?? 0,
       });
 
       // Sidebar data
@@ -92,6 +113,9 @@ export default function ProfilePage() {
           score: profileData.creatorRank.score,
           level: profileData.creatorRank.level,
         } : null,
+        recentActivity: profileData.recentActivity ?? profileData.recent_activity ?? [],
+        upcomingStreams: profileData.upcomingStreams ?? profileData.upcoming_streams ?? [],
+        topDonors: profileData.topDonors ?? profileData.top_donors ?? [],
       });
 
       setIsLive(!!profileData.currentStream);
@@ -112,7 +136,6 @@ export default function ProfilePage() {
       setPosts(Array.isArray(postsData) ? postsData : []);
       setHasMoreFeed(false);
     } catch {
-      // Silently fail - show empty feed
       setPosts([]);
     } finally {
       setFeedLoading(false);
@@ -128,7 +151,6 @@ export default function ProfilePage() {
   const handleAvatarUpload = async (file: File) => {
     if (!token) return;
     
-    // Validate before upload
     const validationError = validateUploadFile(file, 'avatar');
     if (validationError) {
       showToast?.({ type: 'error', title: 'Invalid file', message: validationError });
@@ -143,10 +165,8 @@ export default function ProfilePage() {
       });
       
       if (result.url) {
-        // Immediately update the UI
         setProfile((prev: any) => prev ? { ...prev, avatarUrl: result.url } : prev);
         showToast?.({ type: 'success', title: 'Avatar updated', message: 'Profile photo updated successfully' });
-        // Refresh profile from backend
         setTimeout(() => fetchProfile(), 500);
       } else if (result.error) {
         showToast?.({ type: 'error', title: 'Upload failed', message: result.error });
@@ -159,7 +179,6 @@ export default function ProfilePage() {
   const handleBannerUpload = async (file: File) => {
     if (!token) return;
     
-    // Validate before upload
     const validationError = validateUploadFile(file, 'banner');
     if (validationError) {
       showToast?.({ type: 'error', title: 'Invalid file', message: validationError });
@@ -174,10 +193,8 @@ export default function ProfilePage() {
       });
       
       if (result.url) {
-        // Immediately update the UI
         setProfile((prev: any) => prev ? { ...prev, bannerUrl: result.url } : prev);
         showToast?.({ type: 'success', title: 'Banner updated', message: 'Cover image updated successfully' });
-        // Refresh profile from backend
         setTimeout(() => fetchProfile(), 500);
       } else if (result.error) {
         showToast?.({ type: 'error', title: 'Upload failed', message: result.error });
@@ -207,7 +224,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto">
-        <div className="skeleton h-72 rounded-3xl mb-6" />
+        <div className="skeleton h-72 lg:h-96 rounded-3xl mb-6" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <div className="skeleton h-24 rounded-2xl" />
@@ -219,6 +236,7 @@ export default function ProfilePage() {
             <div className="skeleton h-48 rounded-2xl" />
             <div className="skeleton h-32 rounded-2xl" />
             <div className="skeleton h-40 rounded-2xl" />
+            <div className="skeleton h-24 rounded-2xl" />
           </div>
         </div>
       </div>
@@ -228,14 +246,23 @@ export default function ProfilePage() {
   if (error) {
     return (
       <div className="max-w-7xl mx-auto flex flex-col items-center justify-center py-24">
-        <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-4">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-4"
+        >
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-400"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        </div>
+        </motion.div>
         <h2 className="text-lg font-medium text-white/60 mb-2">Failed to load profile</h2>
         <p className="text-sm text-white/30 mb-6 max-w-md text-center">{error}</p>
-        <button onClick={fetchProfile} className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white text-sm font-bold">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={fetchProfile}
+          className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white text-sm font-bold"
+        >
           Try Again
-        </button>
+        </motion.button>
       </div>
     );
   }
@@ -269,11 +296,58 @@ export default function ProfilePage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ delay: 0.1, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
           className="mt-6 px-4 sm:px-6"
         >
           <div className="rounded-2xl bg-white/[0.02] border border-white/[0.04] p-4">
             <ProfileStats stats={stats} />
+          </div>
+        </motion.div>
+
+        {/* Quick Metrics Row */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className="mt-4 px-4 sm:px-6"
+        >
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="rounded-2xl bg-white/[0.02] border border-white/[0.04] p-3 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-[#00d8ff]/10 border border-[#00d8ff]/20 flex items-center justify-center">
+                <Eye size={14} className="text-[#00d8ff]" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-white">{metrics.totalViews.toLocaleString()}</p>
+                <p className="text-[9px] text-white/40">Total Views</p>
+              </div>
+            </div>
+            <div className="rounded-2xl bg-white/[0.02] border border-white/[0.04] p-3 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                <Activity size={14} className="text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-white">{metrics.totalWatchTime}</p>
+                <p className="text-[9px] text-white/40">Watch Time</p>
+              </div>
+            </div>
+            <div className="rounded-2xl bg-white/[0.02] border border-white/[0.04] p-3 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                <Target size={14} className="text-amber-400" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-white">{metrics.engagement}%</p>
+                <p className="text-[9px] text-white/40">Engagement</p>
+              </div>
+            </div>
+            <div className="rounded-2xl bg-white/[0.02] border border-white/[0.04] p-3 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-[#ff007f]/10 border border-[#ff007f]/20 flex items-center justify-center">
+                <TrendingUp size={14} className="text-[#ff007f]" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-white">#{metrics.rank.toLocaleString()}</p>
+                <p className="text-[9px] text-white/40">Creator Rank</p>
+              </div>
+            </div>
           </div>
         </motion.div>
 
@@ -291,6 +365,8 @@ export default function ProfilePage() {
                 <ProfileTabs
                   activeTab={activeTab}
                   onTabChange={setActiveTab}
+                  viewMode={viewMode}
+                  onViewModeChange={setViewMode}
                   counts={{
                     posts: stats.posts,
                     streams: stats.streams,
@@ -301,7 +377,7 @@ export default function ProfilePage() {
 
               {/* Feed */}
               <motion.div
-                key={activeTab}
+                key={`${activeTab}-${viewMode}`}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
@@ -312,6 +388,7 @@ export default function ProfilePage() {
                   loading={feedLoading}
                   hasMore={hasMoreFeed}
                   onLoadMore={fetchPosts}
+                  viewMode={viewMode}
                 />
               </motion.div>
             </div>
@@ -325,6 +402,9 @@ export default function ProfilePage() {
                   badges={sidebarData.badges}
                   achievements={sidebarData.achievements}
                   creatorRank={sidebarData.creatorRank}
+                  recentActivity={sidebarData.recentActivity}
+                  upcomingStreams={sidebarData.upcomingStreams}
+                  topDonors={sidebarData.topDonors}
                 />
               </div>
             </div>

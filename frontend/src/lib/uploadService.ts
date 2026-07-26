@@ -1,10 +1,9 @@
 'use client';
 
-import { apiUpload } from './apiClient';
+import { API_BASE_URL, authHeaders } from './api';
 
-const MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5MB
-const MAX_BANNER_SIZE = 10 * 1024 * 1024; // 10MB
-const MAX_RETRIES = 3;
+const MAX_AVATAR_SIZE = 3 * 1024 * 1024; // 3MB (matches backend)
+const MAX_BANNER_SIZE = 3 * 1024 * 1024; // 3MB (matches backend)
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export interface UploadResult {
@@ -32,8 +31,8 @@ function validateImage(file: File, maxSize: number, fieldName: string): string |
 
 // Compress image before upload
 function compressImage(file: File, maxWidth: number = 2048, quality: number = 0.85): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    // Skip compression for WebP images under 500KB
+  return new Promise((resolve) => {
+    // Skip compression for files under 500KB
     if (file.size < 500 * 1024) {
       resolve(file);
       return;
@@ -61,17 +60,14 @@ function compressImage(file: File, maxWidth: number = 2048, quality: number = 0.
       const ctx = canvas.getContext('2d');
       if (!ctx) { resolve(file); return; }
       
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(img, 0, 0, width, height);
       
       canvas.toBlob(
         (blob) => {
           if (blob) {
-            // If compressed is larger than original, use original
-            if (blob.size >= file.size) {
-              resolve(file);
-            } else {
-              resolve(blob);
-            }
+            resolve(blob.size >= file.size ? file : blob);
           } else {
             resolve(file);
           }
@@ -83,51 +79,78 @@ function compressImage(file: File, maxWidth: number = 2048, quality: number = 0.
     
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      resolve(file); // Fall back to original on error
+      resolve(file);
     };
     
     img.src = url;
   });
 }
 
-// Upload with retry logic
-async function uploadWithRetry(
+/**
+ * Direct upload using XMLHttpRequest for reliable progress tracking.
+ * Matches the backend API exactly:
+ * - Method: POST
+ * - Field: 'avatar' or 'banner'
+ * - Route: /api/profiles/me/avatar or /api/profiles/me/banner
+ * - Response: { message, profile, url }
+ */
+function directUpload(
   path: string,
-  formData: FormData,
+  fieldName: string,
+  file: File,
   token: string,
-  retries: number = MAX_RETRIES
+  onProgress?: (percent: number) => void
 ): Promise<UploadResult> {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const result = await apiUpload<{ url: string }>(path, formData, token);
-      if (result?.url) {
-        // Invalidate user profile cache
-        if (typeof window !== 'undefined') {
-          const cacheKey = `GET:${process.env.NEXT_PUBLIC_API_URL || ''}/api/profiles/me`;
-          if ('caches' in window) {
-            caches.open('sparklive-api').then(cache => {
-              cache.keys().then(keys => {
-                keys.filter(k => k.url.includes('/api/profiles/me')).forEach(k => cache.delete(k));
-              });
-            }).catch(() => {});
+  return new Promise((resolve) => {
+    const url = `${API_BASE_URL}${path}`;
+    const formData = new FormData();
+    formData.append(fieldName, file);
+
+    const xhr = new XMLHttpRequest();
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      try {
+        const response = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          // Backend returns: { message, profile, url }
+          const imageUrl = response?.url || response?.data?.url || '';
+          if (imageUrl) {
+            resolve({ url: imageUrl });
+          } else {
+            resolve({ url: '', error: 'No URL returned from server' });
           }
+        } else {
+          const errorMsg = response?.error || response?.message || `Upload failed (${xhr.status})`;
+          resolve({ url: '', error: errorMsg });
         }
-        return { url: result.url };
+      } catch {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve({ url: '', error: 'Invalid response from server' });
+        } else {
+          resolve({ url: '', error: `Upload failed (${xhr.status})` });
+        }
       }
-      throw new Error('No URL returned from upload');
-    } catch (error: any) {
-      if (attempt < retries) {
-        // Wait before retry (exponential backoff)
-        await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));
-        continue;
-      }
-      return {
-        url: '',
-        error: error.message || 'Upload failed after multiple attempts. Please try again.',
-      };
-    }
-  }
-  return { url: '', error: 'Upload failed' };
+    });
+
+    xhr.addEventListener('error', () => {
+      resolve({ url: '', error: 'Network error during upload' });
+    });
+
+    xhr.addEventListener('abort', () => {
+      resolve({ url: '', error: 'Upload cancelled' });
+    });
+
+    xhr.open('POST', url);
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    // Do NOT set Content-Type - browser sets it with boundary for FormData
+    xhr.send(formData);
+  });
 }
 
 // Upload avatar
@@ -145,17 +168,22 @@ export async function uploadAvatar(
   try {
     onProgress?.({ percent: 0, status: 'compressing' });
     
-    // Compress
+    // Compress - avatars can be smaller
     const compressed = await compressImage(file, 512, 0.8);
-    const compressedFile = new File([compressed], file.name, { type: compressed.type });
+    const compressedFile = new File([compressed], `avatar-${Date.now()}.webp`, { 
+      type: 'image/webp' 
+    });
     
     onProgress?.({ percent: 30, status: 'uploading' });
     
-    // Upload
-    const formData = new FormData();
-    formData.append('avatar', compressedFile);
-    
-    const result = await uploadWithRetry('/api/profiles/me/avatar', formData, token);
+    // Upload via POST with field name 'avatar' (matches backend)
+    const result = await directUpload(
+      '/api/profiles/me/avatar',
+      'avatar',
+      compressedFile,
+      token,
+      (percent) => onProgress?.({ percent: 30 + percent * 0.7, status: 'uploading' })
+    );
     
     if (result.url) {
       onProgress?.({ percent: 100, status: 'done' });
@@ -186,17 +214,22 @@ export async function uploadBanner(
   try {
     onProgress?.({ percent: 0, status: 'compressing' });
     
-    // Compress
+    // Compress - banners can be larger
     const compressed = await compressImage(file, 2048, 0.85);
-    const compressedFile = new File([compressed], file.name, { type: compressed.type });
+    const compressedFile = new File([compressed], `banner-${Date.now()}.webp`, { 
+      type: 'image/webp' 
+    });
     
     onProgress?.({ percent: 30, status: 'uploading' });
     
-    // Upload
-    const formData = new FormData();
-    formData.append('banner', compressedFile);
-    
-    const result = await uploadWithRetry('/api/profiles/me/banner', formData, token);
+    // Upload via POST with field name 'banner' (matches backend)
+    const result = await directUpload(
+      '/api/profiles/me/banner',
+      'banner',
+      compressedFile,
+      token,
+      (percent) => onProgress?.({ percent: 30 + percent * 0.7, status: 'uploading' })
+    );
     
     if (result.url) {
       onProgress?.({ percent: 100, status: 'done' });

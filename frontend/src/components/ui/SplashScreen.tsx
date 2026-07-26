@@ -36,7 +36,7 @@ export default function SplashScreen({ onComplete, duration = 2500 }: SplashScre
             <div className="absolute bottom-1/4 left-1/4 w-[350px] h-[350px] rounded-full bg-[#00d8ff] opacity-[0.02] blur-[100px] animate-float" />
           </div>
 
-          {/* Logo */}
+          {/* Logo - Using official uploaded SparkLive logo */}
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -57,31 +57,15 @@ export default function SplashScreen({ onComplete, duration = 2500 }: SplashScre
                 transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
               />
               
-              {/* Logo SVG */}
-              <svg
-                width="80"
-                height="80"
-                viewBox="0 0 512 512"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="relative"
-              >
-                <defs>
-                  <linearGradient id="splashGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#FF2E8B" />
-                    <stop offset="35%" stopColor="#FF3EA5" />
-                    <stop offset="65%" stopColor="#8B3DFF" />
-                    <stop offset="100%" stopColor="#C45CFF" />
-                  </linearGradient>
-                </defs>
-                <g transform="translate(256, 256)">
-                  <path d="M 0,-200 C 60,-170 110,-110 120,-50 C 132,20 120,80 90,130 C 55,190 20,220 0,230 C -20,220 -55,190 -90,130 C -120,80 -132,20 -120,-50 C -110,-110 -60,-170 0,-200 Z" fill="url(#splashGrad)"/>
-                  <path d="M 0,50 C -25,10 -80,-5 -105,25 C -130,55 -125,95 -95,115 C -65,135 -30,135 0,105 Z" fill="url(#splashGrad)"/>
-                  <path d="M 0,50 C 25,10 80,-5 105,25 C 130,55 125,95 95,115 C 65,135 30,135 0,105 Z" fill="url(#splashGrad)"/>
-                  <path d="M 0,-200 C -45,-165 -85,-100 -100,-40 C -55,-75 -25,-95 0,-105 Z" fill="url(#splashGrad)" opacity="0.85"/>
-                  <path d="M 0,-200 C 45,-165 85,-100 100,-40 C 55,-75 25,-95 0,-105 Z" fill="url(#splashGrad)" opacity="0.85"/>
-                </g>
-              </svg>
+              {/* Official SparkLive Logo */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/branding/sparklive-logo.png"
+                alt="SparkLive"
+                width={80}
+                height={80}
+                className="relative object-contain"
+              />
             </div>
           </motion.div>
 

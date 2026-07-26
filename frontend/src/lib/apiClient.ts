@@ -333,25 +333,86 @@ export const apiDelete = async <T>(
   return makeRequest<T>('DELETE', path, { token });
 };
 
+/**
+ * Upload a file via FormData.
+ * Supports both POST and PUT methods. The browser automatically sets
+ * the correct Content-Type (multipart/form-data) for FormData bodies.
+ */
 export const apiUpload = async <T>(
   path: string,
   formData: FormData,
   token?: string,
+  method: 'POST' | 'PUT' = 'POST',
   onProgress?: (percent: number) => void
 ): Promise<T> => {
   const url = `${API_BASE_URL}${path}`;
   invalidateCache(path.split('/').slice(1, 3).join('/'));
   
   if (process.env.NODE_ENV === 'development') {
-    console.log(`[API] POST ${url} (FormData)`);
+    console.log(`[API] ${method} ${url} (FormData)`);
   }
 
   const executeUpload = async (retryCount: number = 0): Promise<T> => {
     try {
+      // Use XMLHttpRequest for upload progress tracking
+      if (onProgress && typeof XMLHttpRequest !== 'undefined') {
+        return await new Promise<T>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          
+          xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+              const percent = Math.round((e.loaded / e.total) * 100);
+              onProgress(percent);
+            }
+          });
+          
+          xhr.addEventListener('load', () => {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(data as T);
+              } else {
+                reject(new ApiError(
+                  xhr.status,
+                  data.error || data.message || `Upload failed with status ${xhr.status}`,
+                  data
+                ));
+              }
+            } catch {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve({ message: xhr.responseText } as T);
+              } else {
+                reject(new ApiError(xhr.status, xhr.responseText || 'Upload failed'));
+              }
+            }
+          });
+          
+          xhr.addEventListener('error', () => {
+            reject(new ApiError(0, 'Network error during upload'));
+          });
+          
+          xhr.addEventListener('abort', () => {
+            reject(new ApiError(499, 'Upload cancelled'));
+          });
+          
+          xhr.open(method, url);
+          
+          // Set auth header
+          if (token) {
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+          }
+          
+          // Don't set Content-Type - browser sets it for FormData
+          xhr.send(formData);
+        });
+      }
+
+      // Fallback to fetch if XHR is not available or no progress needed
       const response = await fetch(url, {
-        method: 'POST',
+        method,
         headers: {
           ...authHeaders(token),
+          // Don't set Content-Type - browser sets it for FormData
         },
         body: formData,
         credentials: 'include',
@@ -360,8 +421,19 @@ export const apiUpload = async <T>(
       const data = await readJson(response);
       return data as T;
     } catch (error) {
+      if (error instanceof ApiError) {
+        // Don't retry client errors (4xx)
+        if (error.statusCode >= 400 && error.statusCode < 500) {
+          handleSessionExpiry(error);
+          throw error;
+        }
+      }
+
       if (retryCount < MAX_RETRIES) {
         const delay = RETRY_DELAY * Math.pow(RETRY_BACKOFF, retryCount);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[API] Upload retry ${retryCount + 1}/${MAX_RETRIES} for ${method} ${url} after ${delay}ms`);
+        }
         await sleep(delay);
         return executeUpload(retryCount + 1);
       }

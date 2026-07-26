@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
-import SparkLiveLogo from "@/components/ui/SparkLiveLogo";
 
 export default function Footer() {
   return (
@@ -11,10 +9,11 @@ export default function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 lg:gap-12">
           {/* Brand */}
           <div className="col-span-2 lg:col-span-2">
-            <Link href="/" className="inline-flex items-center gap-2.5 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shadow-lg shadow-pink-500/20">
-                <SparkLiveLogo size={16} className="text-white" />
-              </div>
+          <Link href="/" className="inline-flex items-center gap-2.5 mb-4">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shadow-lg shadow-pink-500/20">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/branding/sparklive-logo.png" alt="SparkLive" width={18} height={18} className="object-contain" style={{ width: 18, height: 18 }} />
+            </div>
               <span className="text-lg font-black text-white">
                 Spark<span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-400">Live</span>
               </span>

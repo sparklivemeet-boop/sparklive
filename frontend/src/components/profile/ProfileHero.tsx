@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, MapPin, Link as LinkIcon, Calendar, Shield, MoreHorizontal, Share2, Edit3, Check, X, Upload, Loader2 } from 'lucide-react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
+import { Camera, MapPin, Link as LinkIcon, Calendar, Shield, MoreHorizontal, Share2, Edit3, Check, X, Upload, Loader2, Heart, MessageCircle, Eye, Star, Sparkles, Music, Gamepad2, Palette, BookOpen, Trophy, Monitor, Smartphone, Users, ChevronDown, Gift, Zap, Crown, Award, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Avatar from '@/components/ui/Avatar';
 import Button from '@/components/ui/Button';
@@ -16,6 +16,12 @@ interface ProfileHeroProps {
   onAvatarUpload: (file: File) => Promise<void>;
   onBannerUpload: (file: File) => Promise<void>;
 }
+
+const CATEGORY_ICONS: Record<string, any> = {
+  music: Music, gaming: Gamepad2, creative: Palette, education: BookOpen,
+  sports: Trophy, tech: Monitor, lifestyle: Heart, mobile: Smartphone,
+  chatting: MessageCircle,
+};
 
 export default function ProfileHero({
   profile,
@@ -31,8 +37,22 @@ export default function ProfileHero({
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showBio, setShowBio] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
+
+  const { scrollYProgress } = useScroll({
+    target: heroRef,
+    offset: ['start start', 'end start'],
+  });
+
+  const bannerParallaxY = useTransform(scrollYProgress, [0, 1], ['0%', '30%']);
+  const bannerScale = useTransform(scrollYProgress, [0, 1], [1, 1.1]);
+  const bannerOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0.6]);
+  const infoY = useTransform(scrollYProgress, [0, 1], [0, 50]);
+  const infoOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0.8]);
 
   const handleBannerUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -58,30 +78,101 @@ export default function ProfileHero({
     }
   }, [onAvatarUpload]);
 
+  const formatCount = (num: number) => {
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+    return num.toString();
+  };
+
+  const CategoryIcon = profile?.creatorCategory ? CATEGORY_ICONS[profile.creatorCategory.toLowerCase()] : null;
+
   return (
-    <div className="relative">
-      {/* Banner / Cover Image */}
+    <div ref={heroRef} className="relative">
+      {/* Banner / Cover Image with Parallax */}
       <div
-        className="relative h-48 sm:h-56 md:h-64 lg:h-72 xl:h-80 rounded-3xl overflow-hidden group"
+        className="relative h-48 sm:h-56 md:h-64 lg:h-80 xl:h-96 rounded-3xl overflow-hidden group"
         onMouseEnter={() => setBannerHover(true)}
         onMouseLeave={() => setBannerHover(false)}
       >
-        {/* Banner Image */}
-        {profile?.bannerUrl ? (
-          <motion.img
-            src={profile.bannerUrl}
-            alt="Profile banner"
-            className="w-full h-full object-cover"
-            initial={{ scale: 1.1, filter: 'blur(10px)' }}
-            animate={{ scale: 1, filter: 'blur(0px)' }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-[#ff007f]/20 via-[#7a00cc]/20 to-[#00d8ff]/10" />
+        {/* Parallax Wrapper */}
+        <motion.div
+          className="absolute inset-0"
+          style={{ y: bannerParallaxY, scale: bannerScale, opacity: bannerOpacity }}
+        >
+          {/* Banner Image */}
+          {profile?.bannerUrl ? (
+            <motion.img
+              src={profile.bannerUrl}
+              alt="Profile banner"
+              className="w-full h-[130%] object-cover"
+              initial={{ scale: 1.1, filter: 'blur(20px)' }}
+              animate={imageLoaded ? { scale: 1, filter: 'blur(0px)' } : {}}
+              transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+              onLoad={() => setImageLoaded(true)}
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-[#ff007f]/20 via-[#7a00cc]/20 to-[#00d8ff]/10">
+              {/* Animated gradient overlay for empty banner */}
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-[#ff007f]/10 via-transparent to-[#00d8ff]/10"
+                animate={{
+                  backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+                }}
+                transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+                style={{ backgroundSize: '200% 200%' }}
+              />
+            </div>
+          )}
+        </motion.div>
+
+        {/* Gradient Overlays */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#07070d] via-[#07070d]/30 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#07070d]/40 via-transparent to-[#07070d]/20" />
+
+        {/* Top gradient for depth */}
+        <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-[#07070d]/60 to-transparent" />
+
+        {/* Live Stream Overlay */}
+        {isLive && (
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="absolute top-4 left-4 flex items-center gap-3"
+          >
+            <div className="flex items-center gap-1.5 bg-black/70 backdrop-blur-xl rounded-full px-3 py-1.5 border border-red-500/30 shadow-lg shadow-red-500/20">
+              <motion.span
+                className="w-2.5 h-2.5 rounded-full bg-red-500"
+                animate={{ scale: [1, 1.3, 1], opacity: [1, 0.7, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+              />
+              <span className="text-[10px] font-bold text-white uppercase tracking-wider">LIVE</span>
+              <span className="text-[10px] text-white/50 ml-1">
+                {formatCount(profile?.currentStream?.viewerCount || 0)} watching
+              </span>
+            </div>
+            {profile?.currentStream?.category && (
+              <div className="hidden sm:flex items-center gap-1.5 bg-black/60 backdrop-blur-xl rounded-full px-3 py-1.5 border border-white/[0.08]">
+                {CategoryIcon && <CategoryIcon size={10} className="text-white/60" />}
+                <span className="text-[10px] text-white/60">{profile.currentStream.category}</span>
+              </div>
+            )}
+          </motion.div>
         )}
 
-        {/* Banner Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#07070d] via-[#07070d]/40 to-transparent" />
+        {/* Top Right Actions */}
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          {isOwnProfile && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onShareProfile}
+              className="p-2.5 rounded-2xl bg-black/50 backdrop-blur-xl border border-white/[0.1] text-white/70 hover:text-white hover:bg-black/70 transition-all"
+              aria-label="Share profile"
+            >
+              <Share2 size={15} />
+            </motion.button>
+          )}
+        </div>
 
         {/* Editable Banner Overlay */}
         {isOwnProfile && (
@@ -93,7 +184,9 @@ export default function ProfileHero({
                 exit={{ opacity: 0 }}
                 className="absolute inset-0 bg-black/50 flex items-center justify-center"
               >
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => bannerInputRef.current?.click()}
                   disabled={uploadingBanner}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white/15 backdrop-blur-xl border border-white/20 text-white text-sm font-medium hover:bg-white/25 transition-all disabled:opacity-50"
@@ -104,7 +197,7 @@ export default function ProfileHero({
                     <Camera size={16} />
                   )}
                   {uploadingBanner ? 'Uploading...' : 'Change Cover'}
-                </button>
+                </motion.button>
               </motion.div>
             )}
           </AnimatePresence>
@@ -118,18 +211,49 @@ export default function ProfileHero({
           onChange={handleBannerUpload}
           aria-label="Upload banner image"
         />
+
+        {/* Scroll indicator */}
+        <motion.div
+          className="absolute bottom-4 left-1/2 -translate-x-1/2"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.5 }}
+        >
+          <motion.div
+            animate={{ y: [0, 6, 0] }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <ChevronDown size={20} className="text-white/30" />
+          </motion.div>
+        </motion.div>
       </div>
 
       {/* Profile Info Section */}
-      <div className="relative px-4 sm:px-6 -mt-16 sm:-mt-20 md:-mt-24">
+      <motion.div
+        style={{ y: infoY, opacity: infoOpacity }}
+        className="relative px-4 sm:px-6 -mt-16 sm:-mt-20 md:-mt-24 lg:-mt-28"
+      >
         <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 sm:gap-6">
-          {/* Avatar */}
-          <div
+          {/* Avatar with Enhanced Effects */}
+          <motion.div
             className="relative shrink-0"
             onMouseEnter={() => setAvatarHover(true)}
             onMouseLeave={() => setAvatarHover(false)}
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
           >
-            <div className="relative w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full border-4 border-[#07070d] overflow-hidden shadow-2xl">
+            {/* Glow ring */}
+            <motion.div
+              className="absolute -inset-2 rounded-full bg-gradient-to-br from-[#ff007f]/30 via-[#7a00cc]/30 to-[#00d8ff]/30 opacity-0 group-hover:opacity-100"
+              animate={isLive ? {
+                opacity: [0.3, 0.6, 0.3],
+                scale: [1, 1.05, 1],
+              } : {}}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            />
+
+            <div className="relative w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-36 lg:h-36 rounded-full border-4 border-[#07070d] overflow-hidden shadow-2xl">
               <Avatar
                 src={profile?.avatarUrl}
                 alt={profile?.fullName || profile?.username || 'User'}
@@ -137,21 +261,35 @@ export default function ProfileHero({
                 className="w-full h-full"
               />
               
-              {/* Online Indicator */}
-              <span className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-[#07070d] shadow-lg shadow-emerald-500/30" />
+              {/* Online Indicator with pulse */}
+              <motion.span
+                className="absolute bottom-1.5 right-1.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-[#07070d] shadow-lg shadow-emerald-500/30"
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              />
 
-              {/* Verified Badge */}
+              {/* Verified Badge with sparkle */}
               {profile?.verified && (
-                <div className="absolute -top-1 -right-1 w-7 h-7 rounded-full bg-gradient-to-br from-[#00d8ff] to-[#3b82f6] flex items-center justify-center shadow-lg shadow-cyan-500/30 border-2 border-[#07070d]">
+                <motion.div
+                  className="absolute -top-1 -right-1 w-7 h-7 rounded-full bg-gradient-to-br from-[#00d8ff] to-[#3b82f6] flex items-center justify-center shadow-lg shadow-cyan-500/30 border-2 border-[#07070d]"
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 15, delay: 0.3 }}
+                >
                   <Check size={12} className="text-white" strokeWidth={3} />
-                </div>
+                </motion.div>
               )}
 
               {/* LIVE Badge */}
               {isLive && (
-                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-gradient-to-r from-red-500 to-rose-600 text-[9px] font-bold text-white tracking-wider shadow-lg shadow-red-500/30">
+                <motion.div
+                  className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-red-500 to-rose-600 text-[9px] font-bold text-white tracking-wider shadow-lg shadow-red-500/30"
+                  initial={{ y: 10, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                >
                   LIVE
-                </div>
+                </motion.div>
               )}
             </div>
 
@@ -184,25 +322,61 @@ export default function ProfileHero({
               onChange={handleAvatarUpload}
               aria-label="Upload avatar image"
             />
-          </div>
+          </motion.div>
 
           {/* Name & Bio */}
-          <div className="flex-1 min-w-0 pt-2 sm:pt-0">
+          <motion.div
+            className="flex-1 min-w-0 pt-2 sm:pt-0"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+          >
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white tracking-tight">
+                  <motion.h1
+                    className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white tracking-tight"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5, delay: 0.3 }}
+                  >
                     {profile?.fullName || profile?.username || 'User'}
-                  </h1>
+                  </motion.h1>
                   {profile?.verified && (
-                    <span className="shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#00d8ff] to-[#3b82f6] flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                    <motion.span
+                      className="shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#00d8ff] to-[#3b82f6] flex items-center justify-center shadow-lg shadow-cyan-500/20"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 15, delay: 0.5 }}
+                    >
                       <Check size={13} className="text-white" strokeWidth={3} />
+                    </motion.span>
+                  )}
+                  {/* Creator Level Badge */}
+                  {profile?.creatorRank?.level && (
+                    <motion.div
+                      className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/20"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.6 }}
+                    >
+                      <Crown size={12} className="text-amber-400" />
+                      <span className="text-[10px] font-bold text-amber-400">Lvl {profile.creatorRank.level}</span>
+                    </motion.div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <p className="text-sm sm:text-base text-white/40 font-medium">
+                    @{profile?.username || 'user'}
+                  </p>
+                  {/* Category Badge */}
+                  {CategoryIcon && (
+                    <span className="hidden sm:flex items-center gap-1 text-[10px] text-white/30">
+                      <CategoryIcon size={10} />
+                      {profile.creatorCategory}
                     </span>
                   )}
                 </div>
-                <p className="text-sm sm:text-base text-white/40 font-medium mt-0.5">
-                  @{profile?.username || 'user'}
-                </p>
               </div>
 
               {/* Action Buttons */}
@@ -289,23 +463,36 @@ export default function ProfileHero({
               </div>
             </div>
 
-            {/* Bio */}
+            {/* Bio with Read More */}
             {profile?.bio && (
-              <motion.p
+              <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                className="text-sm sm:text-base text-white/60 mt-3 max-w-2xl leading-relaxed"
+                transition={{ delay: 0.35, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                className="mt-3"
               >
-                {profile.bio}
-              </motion.p>
+                <p className="text-sm sm:text-base text-white/60 max-w-2xl leading-relaxed">
+                  {profile.bio.length > 150 && !showBio
+                    ? `${profile.bio.slice(0, 150)}...`
+                    : profile.bio
+                  }
+                  {profile.bio.length > 150 && (
+                    <button
+                      onClick={() => setShowBio(!showBio)}
+                      className="ml-1 text-[#00d8ff] hover:text-[#06f7ff] text-xs font-medium transition-colors"
+                    >
+                      {showBio ? 'Show less' : 'Read more'}
+                    </button>
+                  )}
+                </p>
+              </motion.div>
             )}
 
             {/* Meta Info */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              transition={{ delay: 0.4, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
               className="flex flex-wrap items-center gap-3 sm:gap-4 mt-3"
             >
               {profile?.website && (
@@ -313,9 +500,9 @@ export default function ProfileHero({
                   href={profile.website.startsWith('http') ? profile.website : `https://${profile.website}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-xs sm:text-sm text-[#00d8ff] hover:text-[#06f7ff] transition-colors"
+                  className="flex items-center gap-1.5 text-xs sm:text-sm text-[#00d8ff] hover:text-[#06f7ff] transition-colors group"
                 >
-                  <LinkIcon size={13} />
+                  <LinkIcon size={13} className="group-hover:rotate-12 transition-transform" />
                   {profile.website.replace(/^https?:\/\//, '')}
                 </a>
               )}
@@ -344,23 +531,53 @@ export default function ProfileHero({
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ delay: 0.45, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                 className="flex flex-wrap items-center gap-2 mt-3"
               >
                 {profile.badges.map((badge: any, i: number) => (
-                  <span
+                  <motion.span
                     key={i}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-gradient-to-r from-[#ff007f]/10 to-[#7a00cc]/10 border border-[#ff007f]/20 text-pink-300"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.5 + i * 0.05 }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-gradient-to-r from-[#ff007f]/10 to-[#7a00cc]/10 border border-[#ff007f]/20 text-pink-300 hover:bg-[#ff007f]/20 transition-colors cursor-default"
                   >
                     {badge.icon && <span className="text-xs">{badge.icon}</span>}
                     {badge.label}
-                  </span>
+                  </motion.span>
                 ))}
               </motion.div>
             )}
-          </div>
+
+            {/* Social Proof - Top Fans / Recent Supporters */}
+            {profile?.topFans && profile.topFans.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.4 }}
+                className="flex items-center gap-3 mt-4"
+              >
+                <div className="flex -space-x-2">
+                  {profile.topFans.slice(0, 5).map((fan: any, i: number) => (
+                    <motion.div
+                      key={i}
+                      className="w-7 h-7 rounded-full border-2 border-[#07070d] overflow-hidden"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.6 + i * 0.05 }}
+                    >
+                      <Avatar src={fan.avatar} alt={fan.name} size="xs" className="w-full h-full" />
+                    </motion.div>
+                  ))}
+                </div>
+                <div className="text-[10px] text-white/40">
+                  <span className="text-white/60 font-medium">{profile.topFans.length}</span> top fans
+                </div>
+              </motion.div>
+            )}
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

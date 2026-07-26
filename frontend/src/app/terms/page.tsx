@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Sparkles, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Terms of Service | SparkLive",
@@ -23,8 +23,9 @@ export default function TermsPage() {
             <ArrowLeft size={14} /> Back to Home
           </Link>
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
-              <Sparkles size={18} className="text-white" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/branding/sparklive-logo.png" alt="SparkLive" width={20} height={20} className="object-contain" style={{ width: 20, height: 20 }} />
             </div>
             <span className="text-lg font-bold">
               Spark<span className="bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-purple-400">Live</span>

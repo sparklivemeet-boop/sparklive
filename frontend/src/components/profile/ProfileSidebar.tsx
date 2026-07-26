@@ -1,9 +1,10 @@
 'use client';
 
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Radio, Users, Award, TrendingUp, Shield, Star, Zap, Crown, ChevronRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Radio, Users, Award, TrendingUp, Shield, Star, Zap, Crown, ChevronRight, Gift, Heart, MessageCircle, Clock, Calendar, Flame, Sparkles, Music, Gamepad2, Palette, BookOpen, Trophy, Monitor, Smartphone, DollarSign, Activity, BarChart3, Target, Eye } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
+import { cn } from '@/lib/utils';
 
 interface SidebarProps {
   liveNow?: {
@@ -26,6 +27,9 @@ interface SidebarProps {
     score: number;
     level: number;
   };
+  recentActivity?: { type: string; description: string; time: string; icon?: string }[];
+  upcomingStreams?: { title: string; date: string; time: string; category?: string }[];
+  topDonors?: { name: string; amount: number; avatar?: string }[];
 }
 
 function LiveNowCard({ live }: { live: NonNullable<SidebarProps['liveNow']> }) {
@@ -45,7 +49,11 @@ function LiveNowCard({ live }: { live: NonNullable<SidebarProps['liveNow']> }) {
           </div>
         )}
         <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm rounded-full px-2.5 py-1">
-          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          <motion.span
+            className="w-2 h-2 rounded-full bg-red-500"
+            animate={{ scale: [1, 1.3, 1], opacity: [1, 0.7, 1] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+          />
           <span className="text-[10px] font-bold text-white">LIVE</span>
         </div>
         <div className="absolute top-2 right-2 px-2 py-1 rounded-full bg-black/60 backdrop-blur-sm text-[10px] text-white/80">
@@ -90,6 +98,9 @@ function CommunityCard({ community }: { community: NonNullable<SidebarProps['com
 }
 
 function BadgesCard({ badges }: { badges: NonNullable<SidebarProps['badges']> }) {
+  const [showAll, setShowAll] = useState(false);
+  const displayBadges = showAll ? badges : badges.slice(0, 6);
+
   const rarityColors: Record<string, string> = {
     legendary: 'from-amber-400 to-orange-500',
     epic: 'from-purple-400 to-pink-500',
@@ -109,14 +120,14 @@ function BadgesCard({ badges }: { badges: NonNullable<SidebarProps['badges']> })
         <span className="text-[10px] text-white/30">{badges.length} total</span>
       </div>
       <div className="flex flex-wrap gap-2">
-        {badges.slice(0, 6).map((badge) => (
-          <div
-            key={badge.id}
-            className="group relative"
-          >
-            <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${rarityColors[badge.rarity] || 'from-gray-400 to-gray-500'} bg-opacity-20 flex items-center justify-center border border-white/[0.06] cursor-pointer hover:scale-110 transition-transform`}>
+        {displayBadges.map((badge) => (
+          <div key={badge.id} className="group relative">
+            <motion.div
+              whileHover={{ scale: 1.15, rotate: 5 }}
+              className={`w-9 h-9 rounded-xl bg-gradient-to-br ${rarityColors[badge.rarity] || 'from-gray-400 to-gray-500'} bg-opacity-20 flex items-center justify-center border border-white/[0.06] cursor-pointer transition-transform`}
+            >
               <span className="text-sm">{badge.icon}</span>
-            </div>
+            </motion.div>
             {/* Tooltip */}
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-xl bg-[#0e0e16]/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
               <p className="text-[10px] font-medium text-white">{badge.label}</p>
@@ -124,10 +135,14 @@ function BadgesCard({ badges }: { badges: NonNullable<SidebarProps['badges']> })
             </div>
           </div>
         ))}
-        {badges.length > 6 && (
-          <div className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-[10px] text-white/40 font-medium cursor-pointer hover:bg-white/[0.08] transition-colors">
+        {badges.length > 6 && !showAll && (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            onClick={() => setShowAll(true)}
+            className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-[10px] text-white/40 font-medium cursor-pointer hover:bg-white/[0.08] transition-colors"
+          >
             +{badges.length - 6}
-          </div>
+          </motion.button>
         )}
       </div>
     </motion.div>
@@ -169,7 +184,7 @@ function CreatorRankCard({ rank }: { rank: NonNullable<SidebarProps['creatorRank
         </div>
         <div>
           <p className="text-sm font-bold text-white">Creator Rank</p>
-          <p className="text-[10px] text-amber-400/60">Top {rankPercentile}%</p>
+          <p className="text-[10px] text-amber-400/60">Top {Math.round(rankPercentile)}%</p>
         </div>
       </div>
 
@@ -189,13 +204,134 @@ function CreatorRankCard({ rank }: { rank: NonNullable<SidebarProps['creatorRank
 
         {/* Progress bar */}
         <div className="mt-2">
+          <div className="flex items-center justify-between text-[9px] text-white/30 mb-1">
+            <span>Progress to next level</span>
+            <span>{Math.round(rankPercentile)}%</span>
+          </div>
           <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-            <div
+            <motion.div
               className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500"
-              style={{ width: `${Math.min(100, rankPercentile)}%` }}
+              initial={{ width: '0%' }}
+              animate={{ width: `${Math.min(100, rankPercentile)}%` }}
+              transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
             />
           </div>
         </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function RecentActivityCard({ activities }: { activities: NonNullable<SidebarProps['recentActivity']> }) {
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case 'like': return <Heart size={12} className="text-[#ff007f]" />;
+      case 'follow': return <Users size={12} className="text-[#00d8ff]" />;
+      case 'stream': return <Radio size={12} className="text-red-400" />;
+      case 'gift': return <Gift size={12} className="text-amber-400" />;
+      case 'achievement': return <Award size={12} className="text-emerald-400" />;
+      default: return <Activity size={12} className="text-white/40" />;
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.15 }}
+      className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-4"
+    >
+      <h3 className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-3">Recent Activity</h3>
+      <div className="space-y-2">
+        {activities.slice(0, 4).map((activity, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: i * 0.05 }}
+            className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-white/[0.03] transition-colors"
+          >
+            <div className="w-7 h-7 rounded-lg bg-white/[0.04] flex items-center justify-center shrink-0">
+              {getActivityIcon(activity.type)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] text-white/60 truncate">{activity.description}</p>
+              <p className="text-[9px] text-white/30">{activity.time}</p>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+function UpcomingStreamsCard({ streams }: { streams: NonNullable<SidebarProps['upcomingStreams']> }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 }}
+      className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-4"
+    >
+      <h3 className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-3">Upcoming Streams</h3>
+      <div className="space-y-2">
+        {streams.slice(0, 3).map((stream, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.05 }}
+            className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/[0.03] transition-colors cursor-pointer"
+          >
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#ff007f]/10 to-[#7a00cc]/10 border border-white/[0.06] flex items-center justify-center shrink-0">
+              <Calendar size={15} className="text-[#ff007f]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-medium text-white truncate">{stream.title}</p>
+              <p className="text-[9px] text-white/40">{stream.date} at {stream.time}</p>
+            </div>
+            {stream.category && (
+              <span className="text-[8px] text-white/30 px-1.5 py-0.5 rounded-md bg-white/[0.04]">
+                {stream.category}
+              </span>
+            )}
+          </motion.div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+function TopDonorsCard({ donors }: { donors: NonNullable<SidebarProps['topDonors']> }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.25 }}
+      className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-4"
+    >
+      <h3 className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-3">Top Supporters</h3>
+      <div className="space-y-2">
+        {donors.slice(0, 4).map((donor, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: i * 0.05 }}
+            className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-white/[0.03] transition-colors"
+          >
+            <div className="relative">
+              <Avatar src={donor.avatar} alt={donor.name} size="xs" />
+              {i === 0 && (
+                <span className="absolute -top-1 -right-1 text-[8px]">👑</span>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] text-white/70 truncate">{donor.name}</p>
+            </div>
+            <span className="text-[10px] font-semibold text-amber-400">${donor.amount}</span>
+          </motion.div>
+        ))}
       </div>
     </motion.div>
   );
@@ -207,6 +343,9 @@ export default function ProfileSidebar({
   badges,
   achievements,
   creatorRank,
+  recentActivity,
+  upcomingStreams,
+  topDonors,
 }: SidebarProps) {
   return (
     <div className="space-y-4">
@@ -220,6 +359,11 @@ export default function ProfileSidebar({
 
       {/* Community */}
       {community && <CommunityCard community={community} />}
+
+      {/* Recent Activity */}
+      {recentActivity && recentActivity.length > 0 && (
+        <RecentActivityCard activities={recentActivity} />
+      )}
 
       {/* Badges */}
       {badges && badges.length > 0 && <BadgesCard badges={badges} />}
@@ -236,6 +380,16 @@ export default function ProfileSidebar({
             ))}
           </div>
         </div>
+      )}
+
+      {/* Upcoming Streams */}
+      {upcomingStreams && upcomingStreams.length > 0 && (
+        <UpcomingStreamsCard streams={upcomingStreams} />
+      )}
+
+      {/* Top Supporters */}
+      {topDonors && topDonors.length > 0 && (
+        <TopDonorsCard donors={topDonors} />
       )}
 
       {/* Creator Rank */}

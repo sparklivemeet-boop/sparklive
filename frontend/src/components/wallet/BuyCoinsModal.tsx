@@ -6,7 +6,7 @@ import { X, Copy, Check, ExternalLink, Loader2, QrCode, Wallet, ArrowRight, Cloc
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet, apiPost } from '@/lib/apiClient';
-import { SparkCoinIcon } from '@/components/ui/SparkCoinIcon';
+import SparkCoinIcon from '@/components/ui/SparkCoinIcon';
 
 
 interface CoinPackage {

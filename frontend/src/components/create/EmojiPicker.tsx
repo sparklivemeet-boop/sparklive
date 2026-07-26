@@ -4,7 +4,7 @@ import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Flame, Search, Smile, Star, Trophy, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { GiftIcon } from '@/components/ui/GiftIcon';
+import GiftIcon from '@/components/ui/GiftIcon';
 
 
 const EMOJI_CATEGORIES = [

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { API_BASE_URL, authHeaders } from '@/lib/api';
 import { ArrowLeft, Wallet } from 'lucide-react';
-import { SparkCoinIcon } from '@/components/ui/SparkCoinIcon';
+import SparkCoinIcon from '@/components/ui/SparkCoinIcon';
 
 
 interface WalletData {

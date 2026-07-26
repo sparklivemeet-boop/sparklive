@@ -4,7 +4,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Wallet, Shield, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { SparkCoinIcon } from '@/components/ui/SparkCoinIcon';
+import SparkCoinIcon from '@/components/ui/SparkCoinIcon';
 
 
 interface WalletBalanceCardProps {

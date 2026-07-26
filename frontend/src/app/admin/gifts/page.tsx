@@ -11,7 +11,7 @@ import GlassCard from '@/components/ui/GlassCard';
 import Button from '@/components/ui/Button';
 import { getGifts } from '@/lib/adminApi';
 import type { GiftDefinition } from '@/types/admin';
-import { SparkCoinIcon } from '@/components/ui/SparkCoinIcon';
+import SparkCoinIcon from '@/components/ui/SparkCoinIcon';
 
 
 const categoryColors: Record<string, string> = {

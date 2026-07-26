@@ -6,8 +6,8 @@ import { ArrowLeft, Calendar, Coins, Crown, Flame, Gift, Heart, Loader2, Search,
 import Button from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet, apiPost } from '@/lib/apiClient';
-import { SparkCoinIcon } from '@/components/ui/SparkCoinIcon';
-import { GiftIcon } from '@/components/ui/GiftIcon';
+import SparkCoinIcon from '@/components/ui/SparkCoinIcon';
+import GiftIcon from '@/components/ui/GiftIcon';
 
 
 

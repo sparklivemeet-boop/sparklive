@@ -8,8 +8,8 @@ import { Wallet, Plus, ArrowUpRight, ArrowDownLeft, Gift, Sparkles, Loader2, His
 import { cn } from '@/lib/utils';
 import WalletBalanceCard from '@/components/wallet/WalletBalanceCard';
 import BuyCoinsModal from '@/components/wallet/BuyCoinsModal';
-import { GiftIcon } from '@/components/ui/GiftIcon';
-import { SparkCoinIcon } from '@/components/ui/SparkCoinIcon';
+import GiftIcon from '@/components/ui/GiftIcon';
+import SparkCoinIcon from '@/components/ui/SparkCoinIcon';
 
 
 

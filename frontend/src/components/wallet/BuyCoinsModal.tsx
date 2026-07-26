@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet, apiPost } from '@/lib/apiClient';
 import SparkCoinIcon from '@/components/ui/SparkCoinIcon';
+import UsdtIcon from '@/components/ui/UsdtIcon';
+import UsdcIcon from '@/components/ui/UsdcIcon';
 
 
 interface CoinPackage {
@@ -34,13 +36,14 @@ interface BuyCoinsModalProps {
   onSuccess?: (coins: number) => void;
 }
 
-const PAYMENT_NETWORKS: PaymentNetwork[] = [
+const PAYMENT_NETWORKS: (PaymentNetwork & { iconComponent: React.ReactNode })[] = [
   {
     id: 'usdt-bep20',
     name: 'USDT',
     token: 'USDT',
     network: 'BNB Smart Chain (BEP-20)',
-    icon: '<SparkCoinIcon size={16} className="inline-block" />',
+    icon: '',
+    iconComponent: <UsdtIcon size={20} />,
     estimatedTime: '1-3 minutes',
     contractAddress: '0x55d398326f99059fF775485246999027B3197955',
   },
@@ -49,7 +52,8 @@ const PAYMENT_NETWORKS: PaymentNetwork[] = [
     name: 'USDC',
     token: 'USDC',
     network: 'Base Network',
-    icon: '🔵',
+    icon: '',
+    iconComponent: <UsdcIcon size={20} />,
     estimatedTime: '1-3 minutes',
     contractAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
   },
@@ -315,7 +319,7 @@ export default function BuyCoinsModal({ open, onClose, onSuccess }: BuyCoinsModa
                               : 'border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.05]'
                           )}
                         >
-                          <span className="text-xl">{network.icon}</span>
+                          <span className="text-xl">{network.iconComponent}</span>
                           <div className="flex-1">
                             <p className="text-sm font-medium text-white">{network.token}</p>
                             <p className="text-[10px] text-white/40">{network.network}</p>

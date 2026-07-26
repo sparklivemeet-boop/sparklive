@@ -2,8 +2,10 @@
 
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Smile, Search, X } from 'lucide-react';
+import { Flame, Search, Smile, Star, Trophy, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { GiftIcon } from '@/components/ui/GiftIcon';
+
 
 const EMOJI_CATEGORIES = [
   {
@@ -20,11 +22,11 @@ const EMOJI_CATEGORIES = [
   },
   {
     name: 'Objects',
-    emojis: ['🎉', '🎊', '🎈', '🎁', '🏆', '🥇', '🥈', '🥉', '⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏓', '🎯', '🎮', '🎲', '🎸', '🎹', '🎺', '🎵', '🎶', '📸', '📷', '🎥', '📽️', '💻', '📱', '⌚', '🎧'],
+    emojis: ['🎉', '🎊', '🎈', '<GiftIcon size={16} className="inline-block" />', '<Trophy size={16} className="inline-block" />', '🥇', '🥈', '🥉', '⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏓', '🎯', '🎮', '🎲', '🎸', '🎹', '🎺', '🎵', '🎶', '📸', '📷', '🎥', '📽️', '💻', '📱', '⌚', '🎧'],
   },
   {
     name: 'Nature',
-    emojis: ['🌍', '🌎', '🌏', '🌐', '🌈', '☀️', '🌤️', '⛅', '🌦️', '🌧️', '⛈️', '🌩️', '🌨️', '❄️', '🔥', '💫', '⭐', '🌟', '✨', '⚡', '💥', '🌸', '🌺', '🌻', '🌹', '🍀', '🌿', '🌴', '🌵', '🎄'],
+    emojis: ['🌍', '🌎', '🌏', '🌐', '🌈', '☀️', '🌤️', '⛅', '🌦️', '🌧️', '⛈️', '🌩️', '🌨️', '❄️', '<Flame size={16} className="inline-block" />', '💫', '<Star size={16} className="inline-block" />', '🌟', '✨', '⚡', '💥', '🌸', '🌺', '🌻', '🌹', '🍀', '🌿', '🌴', '🌵', '🎄'],
   },
 ];
 

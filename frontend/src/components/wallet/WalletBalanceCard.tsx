@@ -4,6 +4,8 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Wallet, Shield, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SparkCoinIcon } from '@/components/ui/SparkCoinIcon';
+
 
 interface WalletBalanceCardProps {
   coinBalance: number;
@@ -81,7 +83,7 @@ export default function WalletBalanceCard({
               className="text-3xl sm:text-4xl font-black text-white tracking-tight tabular-nums"
             >
               {(coinBalance ?? 0).toLocaleString()}
-              <span className="text-base sm:text-lg font-semibold text-white/40 ml-2">🪙</span>
+              <span className="text-base sm:text-lg font-semibold text-white/40 ml-2"><SparkCoinIcon size={16} className="inline-block" /></span>
             </motion.p>
           </div>
 

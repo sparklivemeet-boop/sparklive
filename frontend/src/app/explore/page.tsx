@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, TrendingUp, Users, Radio, Sparkles, Hash, Compass, ArrowRight, Play, Eye, Music, Gamepad2, Palette, BookOpen, Trophy, Monitor, Heart, Camera, Globe, Star, Zap, Crown } from 'lucide-react';
+import { ArrowRight, BookOpen, Camera, Compass, Crown, Eye, Flame, Gamepad2, Globe, Hash, Heart, Monitor, Music, Palette, Play, Radio, Search, Sparkles, Star, TrendingUp, Trophy, Users, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -22,12 +22,12 @@ const categories = [
 ];
 
 const trending = [
-  { tag: '#SummerVibes', posts: '12.4K', trend: '🔥' },
+  { tag: '#SummerVibes', posts: '12.4K', trend: '<Flame size={16} className="inline-block" />' },
   { tag: '#MusicFestival', posts: '8.7K', trend: '↑' },
-  { tag: '#Gaming', posts: '45.2K', trend: '🔥' },
-  { tag: '#AIArt', posts: '12.3K', trend: '⭐' },
+  { tag: '#Gaming', posts: '45.2K', trend: '<Flame size={16} className="inline-block" />' },
+  { tag: '#AIArt', posts: '12.3K', trend: '<Star size={16} className="inline-block" />' },
   { tag: '#LiveMusic', posts: '5.6K', trend: '↑' },
-  { tag: '#TechTalk', posts: '7.8K', trend: '🔥' },
+  { tag: '#TechTalk', posts: '7.8K', trend: '<Flame size={16} className="inline-block" />' },
 ];
 
 export default function ExplorePage() {
@@ -190,7 +190,7 @@ export default function ExplorePage() {
                       animate={{ scale: [1, 1.2, 1] }}
                       transition={{ duration: 2, repeat: Infinity }}
                     >
-                      🔥
+                      <Flame size={16} className="inline-block" />
                     </motion.span>
                   )}
                 </div>

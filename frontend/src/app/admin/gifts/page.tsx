@@ -11,6 +11,8 @@ import GlassCard from '@/components/ui/GlassCard';
 import Button from '@/components/ui/Button';
 import { getGifts } from '@/lib/adminApi';
 import type { GiftDefinition } from '@/types/admin';
+import { SparkCoinIcon } from '@/components/ui/SparkCoinIcon';
+
 
 const categoryColors: Record<string, string> = {
   everyday: 'bg-white/10 text-gray-300',
@@ -117,7 +119,7 @@ export default function GiftsPage() {
                     <button onClick={() => setEditingPrice(null)} className="text-[10px] text-red-400">✗</button>
                   </div>
                 ) : (
-                  <p className="text-sm font-bold text-yellow-300">{gift.price} 🪙</p>
+                  <p className="text-sm font-bold text-yellow-300">{gift.price} <SparkCoinIcon size={16} className="inline-block" /></p>
                 )}
               </div>
               <div className="flex items-center justify-center gap-2 mt-2">
@@ -175,7 +177,7 @@ export default function GiftsPage() {
                           <button onClick={() => savePrice(gift.id)} className="text-green-400">✓</button>
                         </div>
                       ) : (
-                        <span className="font-bold text-yellow-300">{gift.price.toLocaleString()} 🪙</span>
+                        <span className="font-bold text-yellow-300">{gift.price.toLocaleString()} <SparkCoinIcon size={16} className="inline-block" /></span>
                       )}
                     </td>
                     <td className="py-3 px-2 text-center">

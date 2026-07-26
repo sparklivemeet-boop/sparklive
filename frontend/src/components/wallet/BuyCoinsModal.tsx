@@ -6,6 +6,8 @@ import { X, Copy, Check, ExternalLink, Loader2, QrCode, Wallet, ArrowRight, Cloc
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet, apiPost } from '@/lib/apiClient';
+import { SparkCoinIcon } from '@/components/ui/SparkCoinIcon';
+
 
 interface CoinPackage {
   id: string;
@@ -38,7 +40,7 @@ const PAYMENT_NETWORKS: PaymentNetwork[] = [
     name: 'USDT',
     token: 'USDT',
     network: 'BNB Smart Chain (BEP-20)',
-    icon: '💎',
+    icon: '<SparkCoinIcon size={16} className="inline-block" />',
     estimatedTime: '1-3 minutes',
     contractAddress: '0x55d398326f99059fF775485246999027B3197955',
   },
@@ -252,7 +254,7 @@ export default function BuyCoinsModal({ open, onClose, onSuccess }: BuyCoinsModa
                       >
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400/20 to-orange-500/20 border border-amber-500/20 flex items-center justify-center text-lg">
-                            🪙
+                            <SparkCoinIcon size={16} className="inline-block" />
                           </div>
                           <div>
                             <p className="text-sm font-semibold text-white">{pkg.name}</p>
@@ -432,7 +434,7 @@ export default function BuyCoinsModal({ open, onClose, onSuccess }: BuyCoinsModa
                       transition={{ delay: 0.2 }}
                       className="text-4xl"
                     >
-                      🪙
+                      <SparkCoinIcon size={16} className="inline-block" />
                     </motion.span>
                   </motion.div>
                   <motion.h3

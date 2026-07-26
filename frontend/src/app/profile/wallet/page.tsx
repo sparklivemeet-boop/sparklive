@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { API_BASE_URL, authHeaders } from '@/lib/api';
 import { ArrowLeft, Wallet } from 'lucide-react';
+import { SparkCoinIcon } from '@/components/ui/SparkCoinIcon';
+
 
 interface WalletData {
   coinBalance: number;
@@ -81,10 +83,10 @@ export default function ProfileWalletPage() {
         <main className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
             <div className="rounded-[32px] border border-white/10 bg-black/50 p-8 shadow-[0_30px_90px_rgba(0,0,0,0.18)] backdrop-blur-xl">
-              <div className="absolute -right-10 -top-10 text-[5rem] opacity-10 pointer-events-none">🪙</div>
+              <div className="absolute -right-10 -top-10 text-[5rem] opacity-10 pointer-events-none"><SparkCoinIcon size={16} className="inline-block" /></div>
               <p className="text-sm uppercase tracking-[0.3em] text-gray-400 mb-3">Coin Balance</p>
               <p className="text-5xl font-extrabold text-white">
-                {wallet?.coinBalance ?? 0} <span className="text-yellow-300 text-2xl">🪙</span>
+                {wallet?.coinBalance ?? 0} <span className="text-yellow-300 text-2xl"><SparkCoinIcon size={16} className="inline-block" /></span>
               </p>
               <p className="text-sm text-gray-400 mt-2">Use your coins to power live gifting and VIP moments.</p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">

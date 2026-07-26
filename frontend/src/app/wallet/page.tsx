@@ -8,6 +8,10 @@ import { Wallet, Plus, ArrowUpRight, ArrowDownLeft, Gift, Sparkles, Loader2, His
 import { cn } from '@/lib/utils';
 import WalletBalanceCard from '@/components/wallet/WalletBalanceCard';
 import BuyCoinsModal from '@/components/wallet/BuyCoinsModal';
+import { GiftIcon } from '@/components/ui/GiftIcon';
+import { SparkCoinIcon } from '@/components/ui/SparkCoinIcon';
+
+
 
 export default function WalletPage() {
   const { token } = useAuth();
@@ -372,7 +376,7 @@ export default function WalletPage() {
                         className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white/[0.03] transition-all cursor-pointer"
                       >
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/10 to-rose-500/10 border border-amber-500/20 flex items-center justify-center text-lg">
-                          {gift.emoji || '🎁'}
+                          {gift.emoji || '<GiftIcon size={16} className="inline-block" />'}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-white">{gift.giftName || 'Gift'}</p>
@@ -381,7 +385,7 @@ export default function WalletPage() {
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-bold text-amber-400">{(gift.amount ?? 0).toLocaleString()} 🪙</p>
+                          <p className="text-sm font-bold text-amber-400">{(gift.amount ?? 0).toLocaleString()} <SparkCoinIcon size={16} className="inline-block" /></p>
                         </div>
                       </motion.div>
                     ))}
@@ -532,7 +536,7 @@ function GiftCoinsModal({ balance, onClose, onSend }: { balance: number; onClose
           </button>
         </div>
         <div className="p-5 space-y-4">
-          <p className="text-xs text-white/50">Your balance: <span className="font-bold text-amber-400">{balance.toLocaleString()} 🪙</span></p>
+          <p className="text-xs text-white/50">Your balance: <span className="font-bold text-amber-400">{balance.toLocaleString()} <SparkCoinIcon size={16} className="inline-block" /></span></p>
           
           <div>
             <label className="text-xs font-medium text-white/50 mb-1.5 block">Recipient Username</label>
@@ -577,7 +581,7 @@ function GiftCoinsModal({ balance, onClose, onSend }: { balance: number; onClose
             {sending ? (
               <Loader2 size={14} className="animate-spin mx-auto" />
             ) : (
-              `Send ${amount.toLocaleString()} 🪙`
+              `Send ${amount.toLocaleString()} <SparkCoinIcon size={16} className="inline-block" />`
             )}
           </button>
         </div>

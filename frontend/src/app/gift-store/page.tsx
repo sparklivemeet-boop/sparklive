@@ -2,10 +2,14 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Sparkles, Gift, ArrowLeft, Coins, Loader2, Search, Zap, Crown, Star, Flame, TrendingUp, Calendar, Shield, Heart, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, Calendar, Coins, Crown, Flame, Gift, Heart, Loader2, Search, Shield, ShoppingBag, Sparkles, Star, TrendingUp, Trophy, Zap } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet, apiPost } from '@/lib/apiClient';
+import { SparkCoinIcon } from '@/components/ui/SparkCoinIcon';
+import { GiftIcon } from '@/components/ui/GiftIcon';
+
+
 
 // Types
 interface GiftItem {
@@ -44,13 +48,13 @@ const CATEGORIES = [
 
 // Emoji fallbacks per gift ID
 const EMOJI_FALLBACK: Record<string, string> = {
-  heart: '❤️', rose: '🌹', teddy_bear: '🧸', diamond: '💎', crown: '👑', yacht: '🛥️',
-  spark: '✨', butterfly_swarm: '🦋', shooting_star: '⭐', rainbow: '🌈',
-  gift_box: '🎁', birthday_cake: '🎂', balloons: '🎈', fireworks: '🎆',
-  trophy: '🏆', rocket: '🚀', diamond_ring: '💍', golden_lion: '🦁',
+  heart: '❤️', rose: '🌹', teddy_bear: '🧸', diamond: '<SparkCoinIcon size={16} className="inline-block" />', crown: '👑', yacht: '🛥️',
+  spark: '✨', butterfly_swarm: '🦋', shooting_star: '<Star size={16} className="inline-block" />', rainbow: '🌈',
+  gift_box: '<GiftIcon size={16} className="inline-block" />', birthday_cake: '🎂', balloons: '🎈', fireworks: '🎆',
+  trophy: '<Trophy size={16} className="inline-block" />', rocket: '🚀', diamond_ring: '💍', golden_lion: '🦁',
   dragon: '🐉', private_jet: '✈️', castle: '🏰', supercar: '🏎️',
   ufo: '🛸', planet: '🌍', moon: '🌕', sun: '☀️', helicopter: '🚁',
-  private_island: '🏝️', palace: '🏛️', cruise_ship: '🚢', treasure_chest: '💰',
+  private_island: '🏝️', palace: '🏛️', cruise_ship: '🚢', treasure_chest: '<SparkCoinIcon size={16} className="inline-block" />',
   spark_storm: '⚡', cosmic_supernova: '🌌', galaxy_portal: '🌀',
   golden_dragon: '🐲', unicorn: '🦄', kings_throne: '👑',
   spark_planet: '🌎', meteor_shower: '☄️', spark_universe: '🌠',
@@ -150,7 +154,7 @@ function PurchaseModal({ packages, balance, onClose, onPurchase }: {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-white">Buy SparkCoins</h2>
-            <p className="text-sm text-gray-400 mt-1">Your balance: <span className="text-yellow-300 font-bold">{balance.toLocaleString()}</span> 🪙</p>
+            <p className="text-sm text-gray-400 mt-1">Your balance: <span className="text-yellow-300 font-bold">{balance.toLocaleString()}</span> <SparkCoinIcon size={16} className="inline-block" /></p>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors text-white">
             ✕
@@ -172,7 +176,7 @@ function PurchaseModal({ packages, balance, onClose, onPurchase }: {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl">🪙</span>
+                    <span className="text-2xl"><SparkCoinIcon size={16} className="inline-block" /></span>
                     <span className="text-2xl font-bold text-white">
                       {pkg.coins.toLocaleString()}
                     </span>
@@ -355,7 +359,7 @@ export default function GiftStorePage() {
         if (giftData && giftData.length > 0) {
           setGifts(giftData.map((g: any) => ({
             ...g,
-            emoji: g.emoji || EMOJI_FALLBACK[g.id.replace('gift_', '')] || '🎁',
+            emoji: g.emoji || EMOJI_FALLBACK[g.id.replace('gift_', '')] || '<GiftIcon size={16} className="inline-block" />',
           })));
         }
         if (walletData?.coinBalance !== undefined) setBalance(walletData.coinBalance);
@@ -467,7 +471,7 @@ export default function GiftStorePage() {
                   <span className="text-[11px] uppercase tracking-[0.3em] text-gray-400">Gift Store</span>
                   {packages.filter(p => p.isPopular).length > 0 && (
                     <span className="text-[10px] bg-gradient-to-r from-pink-500 to-purple-600 text-white px-3 py-1 rounded-full font-bold animate-pulse-glow">
-                      🔥 SALE
+                      <Flame size={16} className="inline-block" /> SALE
                     </span>
                   )}
                 </div>
@@ -496,7 +500,7 @@ export default function GiftStorePage() {
                     <p className="text-xs text-gray-400">SparkCoin Balance</p>
                     <p className="text-3xl font-bold text-white mt-0.5">
                       {balance.toLocaleString()}{' '}
-                      <span className="text-xl">🪙</span>
+                      <span className="text-xl"><SparkCoinIcon size={16} className="inline-block" /></span>
                     </p>
                   </div>
                 </div>
@@ -568,7 +572,7 @@ export default function GiftStorePage() {
         {/* Gift Grid */}
         {filteredGifts.length === 0 ? (
           <div className="glass rounded-[28px] p-12 text-center">
-            <div className="text-5xl mb-4">🎁</div>
+            <div className="text-5xl mb-4"><GiftIcon size={16} className="inline-block" /></div>
             <h3 className="text-xl font-bold text-white">No gifts found</h3>
             <p className="text-sm text-gray-400 mt-2">Try a different category or search term</p>
           </div>
@@ -640,7 +644,7 @@ export default function GiftStorePage() {
                       }}
                     >
                       <span className="animate-float" style={{ animationDelay: `${Math.random() * 2}s` }}>
-                        {gift.emoji || EMOJI_FALLBACK[gift.id.replace('gift_', '')] || '🎁'}
+                        {gift.emoji || EMOJI_FALLBACK[gift.id.replace('gift_', '')] || '<GiftIcon size={16} className="inline-block" />'}
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
@@ -683,7 +687,7 @@ export default function GiftStorePage() {
         {/* Bottom info bar */}
         <div className="glass rounded-[20px] p-4 text-center">
           <p className="text-xs text-gray-400">
-            💎 Every gift supports creators • 70% goes directly to them • Gifts are non-refundable
+            <SparkCoinIcon size={16} className="inline-block" /> Every gift supports creators • 70% goes directly to them • Gifts are non-refundable
           </p>
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, Users, Star, Crown, ChevronRight, Sparkles } from 'lucide-react';
+import { ChevronRight, Crown, Flame, Sparkles, Star, TrendingUp, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DiscoverSidebarProps {
@@ -54,9 +54,9 @@ export default function DiscoverSidebar({
                     topic.trend === 'up' && 'text-emerald-400',
                     topic.trend === 'featured' && 'text-amber-400',
                   )}>
-                    {topic.trend === 'hot' && '🔥'}
+                    {topic.trend === 'hot' && '<Flame size={16} className="inline-block" />'}
                     {topic.trend === 'up' && '↑'}
-                    {topic.trend === 'featured' && '⭐'}
+                    {topic.trend === 'featured' && '<Star size={16} className="inline-block" />'}
                   </span>
                   <span className="text-sm text-white/70 group-hover:text-white truncate">{topic.tag}</span>
                 </div>

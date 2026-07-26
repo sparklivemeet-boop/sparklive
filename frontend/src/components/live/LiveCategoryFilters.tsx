@@ -3,6 +3,8 @@
 import React, { useRef } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { Flame } from 'lucide-react';
+
 
 interface Category {
   id: string;
@@ -75,7 +77,7 @@ export default function LiveCategoryFilters({
                 animate={{ scale: [1, 1.2, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
               >
-                🔥
+                <Flame size={16} className="inline-block" />
               </motion.span>
             )}
             {isActive && (

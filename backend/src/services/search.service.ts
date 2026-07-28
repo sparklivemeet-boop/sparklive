@@ -12,17 +12,16 @@ export class SearchService {
     return cacheService.getOrSet(cacheKey, async () => {
       const results: any = {};
 
-      // Case-insensitive search conditions
-      const insensitiveContains = (field: string) => ({
-        [field]: { contains: query, mode: 'insensitive' as const },
-      });
+      // Convert query to lowercase for client-side case-insensitive comparison
+      // SQLite's LIKE is case-insensitive for ASCII, so we use raw `contains` without `mode`
+      const lowerQuery = query.toLowerCase();
 
       if (!type || type === "users" || type === "all") {
         results.users = await prisma.user.findMany({
           where: {
             OR: [
-              { username: { contains: query, mode: 'insensitive' } },
-              { fullName: { contains: query, mode: 'insensitive' } },
+              { username: { contains: query } },
+              { fullName: { contains: query } },
             ],
             status: "ACTIVE",
           },
@@ -42,7 +41,7 @@ export class SearchService {
 
       if (!type || type === "posts" || type === "all") {
         results.posts = await prisma.post.findMany({
-          where: { content: { contains: query, mode: 'insensitive' } },
+          where: { content: { contains: query } },
           orderBy: { createdAt: "desc" },
           take: type === "posts" ? limit : SEARCH_LIMIT_ALL,
           include: {
@@ -56,8 +55,8 @@ export class SearchService {
         results.communities = await prisma.community.findMany({
           where: {
             OR: [
-              { name: { contains: query, mode: 'insensitive' } },
-              { description: { contains: query, mode: 'insensitive' } },
+              { name: { contains: query } },
+              { description: { contains: query } },
             ],
           },
           take: type === "communities" ? limit : SEARCH_LIMIT_ALL,
@@ -72,8 +71,8 @@ export class SearchService {
         results.channels = await prisma.channel.findMany({
           where: {
             OR: [
-              { name: { contains: query, mode: 'insensitive' } },
-              { description: { contains: query, mode: 'insensitive' } },
+              { name: { contains: query } },
+              { description: { contains: query } },
             ],
           },
           take: type === "channels" ? limit : SEARCH_LIMIT_ALL,
@@ -89,8 +88,8 @@ export class SearchService {
           where: {
             active: true,
             OR: [
-              { title: { contains: query, mode: 'insensitive' } },
-              { description: { contains: query, mode: 'insensitive' } },
+              { title: { contains: query } },
+              { description: { contains: query } },
             ],
           },
           take: type === "streams" ? limit : SEARCH_LIMIT_ALL,
@@ -105,8 +104,8 @@ export class SearchService {
         results.videos = await prisma.video.findMany({
           where: {
             OR: [
-              { title: { contains: query, mode: 'insensitive' } },
-              { description: { contains: query, mode: 'insensitive' } },
+              { title: { contains: query } },
+              { description: { contains: query } },
             ],
           },
           orderBy: { views: "desc" },

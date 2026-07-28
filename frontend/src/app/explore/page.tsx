@@ -7,18 +7,18 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
 const categories = [
-  { name: 'Gaming', icon: '🎮', color: 'from-purple-500/20 to-violet-500/20', count: , viewers: '', trending: true },
-  { name: 'Music', icon: '🎵', color: 'from-pink-500/20 to-rose-500/20', count: , viewers: '', trending: true },
-  { name: 'Education', icon: '📚', color: 'from-blue-500/20 to-cyan-500/20', count: , viewers: '' },
-  { name: 'Entertainment', icon: '🎬', color: 'from-amber-500/20 to-orange-500/20', count: , viewers: '', trending: true },
+  { name: 'Gaming', icon: '🎮', color: 'from-purple-500/20 to-violet-500/20', count: 0, viewers: '', trending: true },
+  { name: 'Music', icon: '🎵', color: 'from-pink-500/20 to-rose-500/20', count: 0, viewers: '', trending: true },
+  { name: 'Education', icon: '📚', color: 'from-blue-500/20 to-cyan-500/20', count: 0, viewers: '' },
+  { name: 'Entertainment', icon: '🎬', color: 'from-amber-500/20 to-orange-500/20', count: 0, viewers: '', trending: true },
   { name: 'Sports', icon: '⚽', color: 'from-emerald-500/20 to-teal-500/20', count: 38, viewers: '4.1K' },
-  { name: 'Technology', icon: '💻', color: 'from-indigo-500/20 to-purple-500/20', count: , viewers: '', trending: true },
-  { name: 'Art & Creative', icon: '🎨', color: 'from-orange-500/20 to-yellow-500/20', count: , viewers: '' },
-  { name: 'Lifestyle', icon: '🌟', color: 'from-rose-500/20 to-pink-500/20', count: , viewers: '' },
-  { name: 'News & Politics', icon: '📰', color: 'from-red-500/20 to-rose-500/20', count: , viewers: '' },
-  { name: 'Science', icon: '🔬', color: 'from-cyan-500/20 to-blue-500/20', count: , viewers: '' },
-  { name: 'Travel', icon: '✈️', color: 'from-emerald-500/20 to-green-500/20', count: , viewers: '' },
-  { name: 'Food & Drink', icon: '🍳', color: 'from-orange-500/20 to-amber-500/20', count: , viewers: '' },
+  { name: 'Technology', icon: '💻', color: 'from-indigo-500/20 to-purple-500/20', count: 0, viewers: '', trending: true },
+  { name: 'Art & Creative', icon: '🎨', color: 'from-orange-500/20 to-yellow-500/20', count: 0, viewers: '' },
+  { name: 'Lifestyle', icon: '🌟', color: 'from-rose-500/20 to-pink-500/20', count: 0, viewers: '' },
+  { name: 'News & Politics', icon: '📰', color: 'from-red-500/20 to-rose-500/20', count: 0, viewers: '' },
+  { name: 'Science', icon: '🔬', color: 'from-cyan-500/20 to-blue-500/20', count: 0, viewers: '' },
+  { name: 'Travel', icon: '✈️', color: 'from-emerald-500/20 to-green-500/20', count: 0, viewers: '' },
+  { name: 'Food & Drink', icon: '🍳', color: 'from-orange-500/20 to-amber-500/20', count: 0, viewers: '' },
 ];
 
 const trending = [

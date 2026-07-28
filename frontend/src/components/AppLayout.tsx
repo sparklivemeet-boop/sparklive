@@ -24,6 +24,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import SparkLiveLogo, { SparkLiveSidebarLogo, SparkLiveNavbarLogo } from '@/components/ui/SparkLiveLogo';
+import GlobalSearch from '@/components/search/GlobalSearch';
 import Avatar from '@/components/ui/Avatar';
 
 // Lazy load heavy components
@@ -177,14 +178,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
           {/* Search */}
           <div className="px-4 mb-4">
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={15} />
-              <input
-                type="text"
-                placeholder="Search..."
-                className="w-full rounded-xl border border-white/[0.06] bg-white/[0.04] py-2.5 pl-10 pr-4 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#ff007f]/30 focus:bg-white/[0.06] transition-all"
-              />
-            </div>
+            <GlobalSearch />
           </div>
 
           {/* Navigation */}

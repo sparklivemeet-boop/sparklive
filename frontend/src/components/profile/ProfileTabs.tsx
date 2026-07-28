@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Grid3X3, List, Video, Radio, Play, Heart, Image, Film, Clock, TrendingUp, ChevronDown } from 'lucide-react';
+import { Grid3X3, List, Video, Radio, Play, Heart, Image, Film, Clock, TrendingUp, ChevronDown, MessageCircle, Users, Bookmark, Hash } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ProfileTabsProps {
@@ -15,10 +15,15 @@ interface ProfileTabsProps {
 
 const TABS = [
   { id: 'posts', label: 'Posts', icon: Video },
-  { id: 'streams', label: 'Streams', icon: Radio },
-  { id: 'shorts', label: 'Shorts', icon: Film },
+  { id: 'replies', label: 'Replies', icon: MessageCircle },
   { id: 'media', label: 'Media', icon: Image },
+  { id: 'live', label: 'Live', icon: Radio },
+  { id: 'shorts', label: 'Shorts', icon: Film },
+  { id: 'communities', label: 'Communities', icon: Users },
   { id: 'likes', label: 'Likes', icon: Heart },
+  { id: 'bookmarks', label: 'Bookmarks', icon: Bookmark },
+  { id: 'tagged', label: 'Tagged', icon: Hash },
+  { id: 'saved', label: 'Saved Streams', icon: Clock },
 ];
 
 export default function ProfileTabs({ activeTab, onTabChange, counts, onViewModeChange, viewMode = 'grid' }: ProfileTabsProps) {

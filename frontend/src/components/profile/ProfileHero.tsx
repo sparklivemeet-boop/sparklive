@@ -2,7 +2,14 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
-import { Camera, MapPin, Link as LinkIcon, Calendar, Shield, MoreHorizontal, Share2, Edit3, Check, X, Upload, Loader2, Heart, MessageCircle, Eye, Star, Sparkles, Music, Gamepad2, Palette, BookOpen, Trophy, Monitor, Smartphone, Users, ChevronDown, Gift, Zap, Crown, Award, Flame } from 'lucide-react';
+import {
+  Camera, MapPin, Link as LinkIcon, Calendar, Shield, MoreHorizontal,
+  Share2, Edit3, Check, X, Upload, Loader2, Heart, MessageCircle,
+  Eye, Star, Sparkles, Music, Gamepad2, Palette, BookOpen, Trophy,
+  Monitor, Smartphone, Users, ChevronDown, Gift, Zap, Crown, Award,
+  Flame, Mail, Bell, Copy, ExternalLink, Flag, Volume2,
+  Target, Activity, Circle, Diamond, QrCode, Globe
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Avatar from '@/components/ui/Avatar';
 import Button from '@/components/ui/Button';
@@ -39,6 +46,7 @@ export default function ProfileHero({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showBio, setShowBio] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [mousePosition, setMousePosition] = useState({ x: 50, y: 50 });
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
@@ -53,6 +61,16 @@ export default function ProfileHero({
   const bannerOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0.6]);
   const infoY = useTransform(scrollYProgress, [0, 1], [0, 50]);
   const infoOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0.8]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    const rect = heroRef.current?.getBoundingClientRect();
+    if (rect) {
+      setMousePosition({
+        x: ((e.clientX - rect.left) / rect.width) * 100,
+        y: ((e.clientY - rect.top) / rect.height) * 100,
+      });
+    }
+  }, []);
 
   const handleBannerUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -85,9 +103,21 @@ export default function ProfileHero({
   };
 
   const CategoryIcon = profile?.creatorCategory ? CATEGORY_ICONS[profile.creatorCategory.toLowerCase()] : null;
+  const isGoldVerified = profile?.verified === 'gold' || profile?.verificationType === 'gold';
+  const profileCompletion = profile?.profileCompletion ?? 
+    (profile?.bio ? 20 : 0) + 
+    (profile?.avatarUrl ? 20 : 0) + 
+    (profile?.bannerUrl ? 20 : 0) + 
+    (profile?.website ? 15 : 0) + 
+    (profile?.city ? 15 : 0) + 
+    (profile?.occupation ? 10 : 0);
 
   return (
-    <div ref={heroRef} className="relative">
+    <div
+      ref={heroRef}
+      className="relative"
+      onMouseMove={handleMouseMove}
+    >
       {/* Banner / Cover Image with Parallax */}
       <div
         className="relative h-48 sm:h-56 md:h-64 lg:h-80 xl:h-96 rounded-3xl overflow-hidden group"
@@ -99,6 +129,14 @@ export default function ProfileHero({
           className="absolute inset-0"
           style={{ y: bannerParallaxY, scale: bannerScale, opacity: bannerOpacity }}
         >
+          {/* Animated gradient lighting effect */}
+          <motion.div
+            className="absolute inset-0 opacity-30"
+            style={{
+              background: `radial-gradient(800px circle at ${mousePosition.x}% ${mousePosition.y}%, rgba(255,0,127,0.15), transparent 50%)`,
+            }}
+          />
+
           {/* Banner Image */}
           {profile?.bannerUrl ? (
             <motion.img
@@ -112,7 +150,6 @@ export default function ProfileHero({
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-[#ff007f]/20 via-[#7a00cc]/20 to-[#00d8ff]/10">
-              {/* Animated gradient overlay for empty banner */}
               <motion.div
                 className="absolute inset-0 bg-gradient-to-r from-[#ff007f]/10 via-transparent to-[#00d8ff]/10"
                 animate={{
@@ -128,9 +165,8 @@ export default function ProfileHero({
         {/* Gradient Overlays */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#07070d] via-[#07070d]/30 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#07070d]/40 via-transparent to-[#07070d]/20" />
-
-        {/* Top gradient for depth */}
         <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-[#07070d]/60 to-transparent" />
+        <div className="absolute inset-0 rounded-3xl ring-1 ring-inset ring-white/[0.03] pointer-events-none" />
 
         {/* Live Stream Overlay */}
         {isLive && (
@@ -159,20 +195,50 @@ export default function ProfileHero({
           </motion.div>
         )}
 
-        {/* Top Right Actions */}
-        <div className="absolute top-4 right-4 flex items-center gap-2">
-          {isOwnProfile && (
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={onShareProfile}
-              className="p-2.5 rounded-2xl bg-black/50 backdrop-blur-xl border border-white/[0.1] text-white/70 hover:text-white hover:bg-black/70 transition-all"
-              aria-label="Share profile"
-            >
-              <Share2 size={15} />
-            </motion.button>
-          )}
-        </div>
+        {/* Profile completion indicator */}
+        {isOwnProfile && (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="absolute top-4 right-4"
+          >
+            <div className="group relative">
+              <div className="flex items-center gap-2 bg-black/50 backdrop-blur-xl rounded-full px-3 py-1.5 border border-white/[0.08]">
+                <div className="w-6 h-6 rounded-full bg-white/[0.06] flex items-center justify-center relative">
+                  <motion.div
+                    className="absolute inset-0 rounded-full"
+                    style={{
+                      background: `conic-gradient(from 0deg, #ff007f ${profileCompletion}%, transparent ${profileCompletion}%)`,
+                    }}
+                  />
+                  <div className="absolute inset-[2px] rounded-full bg-black/80 flex items-center justify-center">
+                    <Check size={8} className={profileCompletion >= 80 ? 'text-emerald-400' : 'text-white/40'} />
+                  </div>
+                </div>
+                <span className="text-[9px] text-white/60 font-medium">
+                  {profileCompletion}% complete
+                </span>
+              </div>
+              <div className="absolute right-0 top-full mt-2 px-3 py-2 rounded-xl bg-[#0e0e16]/95 backdrop-blur-2xl border border-white/[0.08] shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                <p className="text-[10px] text-white/70">Profile Strength</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex-1 h-1 rounded-full bg-white/[0.06] overflow-hidden min-w-[80px]">
+                    <motion.div
+                      className="h-full rounded-full bg-gradient-to-r from-[#ff007f] to-[#00d8ff]"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${profileCompletion}%` }}
+                      transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+                    />
+                  </div>
+                  <span className="text-[9px] text-white/50">{profileCompletion}%</span>
+                </div>
+                {profileCompletion < 100 && (
+                  <p className="text-[8px] text-white/30 mt-1">Complete your profile to appear in search</p>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Editable Banner Overlay */}
         {isOwnProfile && (
@@ -243,14 +309,22 @@ export default function ProfileHero({
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
           >
-            {/* Glow ring */}
+            {/* Premium glow ring */}
             <motion.div
-              className="absolute -inset-2 rounded-full bg-gradient-to-br from-[#ff007f]/30 via-[#7a00cc]/30 to-[#00d8ff]/30 opacity-0 group-hover:opacity-100"
+              className="absolute -inset-3 rounded-full opacity-0 group-hover:opacity-100 pointer-events-none"
               animate={isLive ? {
                 opacity: [0.3, 0.6, 0.3],
+                scale: [1, 1.08, 1],
+              } : avatarHover ? {
+                opacity: [0.4, 0.8, 0.4],
                 scale: [1, 1.05, 1],
               } : {}}
               transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              style={{
+                background: isGoldVerified
+                  ? 'radial-gradient(circle, rgba(255,215,0,0.3) 0%, transparent 70%)'
+                  : 'radial-gradient(circle, rgba(255,0,127,0.3) 0%, rgba(124,58,237,0.3) 50%, rgba(0,216,255,0.3) 100%)',
+              }}
             />
 
             <div className="relative w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-36 lg:h-36 rounded-full border-4 border-[#07070d] overflow-hidden shadow-2xl">
@@ -268,15 +342,24 @@ export default function ProfileHero({
                 transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
               />
 
-              {/* Verified Badge with sparkle */}
+              {/* Verification Badge - Blue or Gold */}
               {profile?.verified && (
                 <motion.div
-                  className="absolute -top-1 -right-1 w-7 h-7 rounded-full bg-gradient-to-br from-[#00d8ff] to-[#3b82f6] flex items-center justify-center shadow-lg shadow-cyan-500/30 border-2 border-[#07070d]"
+                  className={cn(
+                    'absolute -top-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center shadow-lg border-2 border-[#07070d]',
+                    isGoldVerified
+                      ? 'bg-gradient-to-br from-amber-400 to-yellow-500 shadow-amber-500/30'
+                      : 'bg-gradient-to-br from-[#00d8ff] to-[#3b82f6] shadow-cyan-500/30'
+                  )}
                   initial={{ scale: 0, rotate: -180 }}
                   animate={{ scale: 1, rotate: 0 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 15, delay: 0.3 }}
                 >
-                  <Check size={12} className="text-white" strokeWidth={3} />
+                  {isGoldVerified ? (
+                    <Crown size={10} className="text-white" strokeWidth={2.5} />
+                  ) : (
+                    <Check size={12} className="text-white" strokeWidth={3} />
+                  )}
                 </motion.div>
               )}
 
@@ -333,7 +416,7 @@ export default function ProfileHero({
           >
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <motion.h1
                     className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white tracking-tight"
                     initial={{ opacity: 0, x: -20 }}
@@ -344,12 +427,21 @@ export default function ProfileHero({
                   </motion.h1>
                   {profile?.verified && (
                     <motion.span
-                      className="shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#00d8ff] to-[#3b82f6] flex items-center justify-center shadow-lg shadow-cyan-500/20"
+                      className={cn(
+                        'shrink-0 w-6 h-6 rounded-full flex items-center justify-center shadow-lg',
+                        isGoldVerified
+                          ? 'bg-gradient-to-br from-amber-400 to-yellow-500 shadow-amber-500/20'
+                          : 'bg-gradient-to-br from-[#00d8ff] to-[#3b82f6] shadow-cyan-500/20'
+                      )}
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ type: 'spring', stiffness: 300, damping: 15, delay: 0.5 }}
                     >
-                      <Check size={13} className="text-white" strokeWidth={3} />
+                      {isGoldVerified ? (
+                        <Crown size={11} className="text-white" strokeWidth={2.5} />
+                      ) : (
+                        <Check size={13} className="text-white" strokeWidth={3} />
+                      )}
                     </motion.span>
                   )}
                   {/* Creator Level Badge */}
@@ -365,7 +457,7 @@ export default function ProfileHero({
                     </motion.div>
                   )}
                 </div>
-                <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <p className="text-sm sm:text-base text-white/40 font-medium">
                     @{profile?.username || 'user'}
                   </p>
@@ -374,6 +466,12 @@ export default function ProfileHero({
                     <span className="hidden sm:flex items-center gap-1 text-[10px] text-white/30">
                       <CategoryIcon size={10} />
                       {profile.creatorCategory}
+                    </span>
+                  )}
+                  {/* Pronouns */}
+                  {profile?.pronouns && (
+                    <span className="text-[10px] text-white/20 px-1.5 py-0.5 rounded-md bg-white/[0.03]">
+                      {profile.pronouns}
                     </span>
                   )}
                 </div>
@@ -420,12 +518,18 @@ export default function ProfileHero({
                             transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
                             className="absolute right-0 top-full mt-2 w-48 py-2 rounded-2xl bg-[#0e0e16]/95 backdrop-blur-2xl border border-white/10 shadow-2xl z-50"
                           >
-                            {['Report', 'Block', 'Copy Profile Link'].map((item) => (
+                            {[
+                              { label: 'Copy Profile Link', icon: Copy },
+                              { label: 'Share via...', icon: ExternalLink },
+                              { label: 'QR Code', icon: QrCode },
+                              { label: 'Report', icon: Flag },
+                            ].map(({ label, icon: Icon }) => (
                               <button
-                                key={item}
-                                className="w-full text-left px-4 py-2.5 text-sm text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+                                key={label}
+                                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:text-white hover:bg-white/5 transition-colors"
                               >
-                                {item}
+                                <Icon size={13} />
+                                {label}
                               </button>
                             ))}
                           </motion.div>
@@ -448,7 +552,7 @@ export default function ProfileHero({
                       className="p-2.5 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/15 text-white/70 hover:text-white hover:bg-white/20 transition-all"
                       aria-label="Send message"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      <Mail size={16} />
                     </motion.button>
                     <motion.button
                       whileHover={{ scale: 1.05 }}
@@ -524,6 +628,12 @@ export default function ProfileHero({
                   {profile.occupation}
                 </span>
               )}
+              {profile?.languages && profile.languages.length > 0 && (
+                <span className="flex items-center gap-1.5 text-xs sm:text-sm text-white/40">
+                  <Globe size={13} />
+                  {profile.languages.join(', ')}
+                </span>
+              )}
             </motion.div>
 
             {/* Creator Badges */}
@@ -534,7 +644,7 @@ export default function ProfileHero({
                 transition={{ delay: 0.45, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                 className="flex flex-wrap items-center gap-2 mt-3"
               >
-                {profile.badges.map((badge: any, i: number) => (
+                {profile.badges.slice(0, 5).map((badge: any, i: number) => (
                   <motion.span
                     key={i}
                     initial={{ opacity: 0, scale: 0.8 }}
@@ -546,6 +656,9 @@ export default function ProfileHero({
                     {badge.label}
                   </motion.span>
                 ))}
+                {profile.badges.length > 5 && (
+                  <span className="text-[10px] text-white/30">+{profile.badges.length - 5} more</span>
+                )}
               </motion.div>
             )}
 

@@ -83,8 +83,10 @@ model User {
   messageReactions  MessageReaction[]
   userPresence      UserPresence?
   liveStreams       LiveStream[]             @relation("HostLiveStreams")
+  coHostStreams     LiveStream[]             @relation("CoHostStreams")
   streamViewers     StreamViewer[]
   liveChatMessages  LiveChatMessage[]
+  liveReactions     LiveReaction[]
   streamerFollowers StreamFollower[]         @relation("StreamerFollowers")
   userStreamFollows StreamFollower[]         @relation("UserStreamFollows")
   userSettings      UserSettings?
@@ -650,25 +652,54 @@ model UserPresence {
 }
 
 model LiveStream {
-  id           String            @id @default(cuid())
-  hostId       String
-  host         User              @relation("HostLiveStreams", fields: [hostId], references: [id], onDelete: Cascade)
-  title        String
-  description  String?
-  thumbnailUrl String?
-  streamKey    String?
-  playbackUrl  String?
-  viewerCount  Int               @default(0)
-  allowGifts   Boolean           @default(true)
-  allowPK      Boolean           @default(false)
-  active       Boolean           @default(true)
-  categoryName String?
-  category     StreamCategory?   @relation(fields: [categoryName], references: [name], onDelete: SetNull)
-  viewers      StreamViewer[]
-  chatMessages LiveChatMessage[]
-  giftEvents   LiveGiftEvent[]
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  id                String            @id @default(cuid())
+  hostId            String
+  host              User              @relation("HostLiveStreams", fields: [hostId], references: [id], onDelete: Cascade)
+  title             String
+  description       String?
+  thumbnailUrl      String?
+  streamKey         String?
+  playbackUrl       String?
+  liveKitRoom       String?           @unique
+  liveKitToken      String?
+  viewerCount       Int               @default(0)
+  peakViewers       Int               @default(0)
+  totalViewers      Int               @default(0)
+  likes             Int               @default(0)
+  gifts             Int               @default(0)
+  allowGifts        Boolean           @default(true)
+  allowPK           Boolean           @default(false)
+  active            Boolean           @default(true)
+  status            String            @default("LIVE") // LIVE, ENDED, SCHEDULED
+  categoryName      String?
+  category          StreamCategory?   @relation(fields: [categoryName], references: [name], onDelete: SetNull)
+  language          String            @default("en")
+  country           String?
+  recordingEnabled  Boolean           @default(false)
+  recordingUrl      String?
+  duration          Int               @default(0) // in seconds
+  startedAt         DateTime?
+  endedAt           DateTime?
+  chatPaused        Boolean           @default(false)
+  slowMode          Boolean           @default(false)
+  slowModeInterval  Int               @default(3) // seconds between messages
+  mutedUsers        String?           // JSON array of muted user IDs
+  bannedUsers       String?           // JSON array of banned user IDs
+  moderators        String?           // JSON array of moderator user IDs
+  coHostId          String?
+  coHost            User?             @relation("CoHostStreams", fields: [coHostId], references: [id], onDelete: SetNull)
+  guests            String?           // JSON array of guest user IDs
+  approvedGuests    String?           // JSON array of approved guest user IDs
+  screenShare       Boolean           @default(false)
+  beautyMode        Boolean           @default(false)
+  backgroundBlur    Boolean           @default(false)
+  noiseSuppression  Boolean           @default(false)
+  viewers           StreamViewer[]
+  chatMessages      LiveChatMessage[]
+  giftEvents        LiveGiftEvent[]
+  reactions         LiveReaction[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
   @@index([active, viewerCount])
   @@index([hostId, active])
@@ -677,6 +708,22 @@ model LiveStream {
   @@index([active, categoryName, viewerCount])
   @@index([hostId, active, createdAt])
   @@index([title])
+  @@index([status])
+  @@index([language])
+  @@index([country])
+}
+
+model LiveReaction {
+  id        String     @id @default(cuid())
+  streamId  String
+  stream    LiveStream @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String
+  createdAt DateTime   @default(now())
+
+  @@index([streamId, createdAt])
+  @@index([userId, streamId])
 }
 
 model StreamCategory {

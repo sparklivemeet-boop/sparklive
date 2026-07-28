@@ -269,9 +269,9 @@ io.on('connection', (socket) => {
 
 // Security headers middleware (additional to helmet)
 app.use((req: Request, res: Response, next) => {
-  // Permissions Policy
+  // Permissions Policy - allow camera and microphone for live streaming
   res.setHeader('Permissions-Policy', 
-    'camera=(), microphone=(), geolocation=(), interest-cohort=()');
+    'camera=(self), microphone=(self), geolocation=(), interest-cohort=()');
   
   // Clear-Site-Data for logout endpoints
   if (req.path === '/api/auth/logout') {

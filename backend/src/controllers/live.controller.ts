@@ -228,3 +228,50 @@ export const getHostStats = async (req: AuthRequest, res: Response): Promise<voi
     res.status(400).json({ error: message });
   }
 };
+
+export const getViewerToken = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const streamId = getParamString(req.params.streamId);
+
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const token = await liveService.getViewerToken(streamId, userId);
+    res.status(200).json({ token });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getHostToken = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const hostId = req.user?.userId;
+    const streamId = getParamString(req.params.streamId);
+
+    if (!hostId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const token = await liveService.getHostToken(streamId, hostId);
+    res.status(200).json({ token });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const likeStream = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const streamId = getParamString(req.params.streamId);
+    const stream = await liveService.likeStream(streamId);
+    res.status(200).json({ likes: stream.likes });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};

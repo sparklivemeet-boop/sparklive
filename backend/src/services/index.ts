@@ -38,3 +38,6 @@ export { matchService, MatchService } from "./match.service";
 
 // Verification & Creator Membership service
 export { verificationService, VerificationService } from "./verification.service";
+
+// LiveKit streaming service
+export { liveKitService, LiveKitService } from "./livekit.service";

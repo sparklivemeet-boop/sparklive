@@ -22,12 +22,12 @@ const categories = [
 ];
 
 const trending = [
-  { tag: '#SummerVibes', posts: '12.4K', trend: '<Flame size={16} className="inline-block" />' },
+  { tag: '#SummerVibes', posts: '12.4K', trend: '🔥' },
   { tag: '#MusicFestival', posts: '8.7K', trend: '↑' },
-  { tag: '#Gaming', posts: '45.2K', trend: '<Flame size={16} className="inline-block" />' },
-  { tag: '#AIArt', posts: '12.3K', trend: '<Star size={16} className="inline-block" />' },
+  { tag: '#Gaming', posts: '45.2K', trend: '🔥' },
+  { tag: '#AIArt', posts: '12.3K', trend: '⭐' },
   { tag: '#LiveMusic', posts: '5.6K', trend: '↑' },
-  { tag: '#TechTalk', posts: '7.8K', trend: '<Flame size={16} className="inline-block" />' },
+  { tag: '#TechTalk', posts: '7.8K', trend: '🔥' },
 ];
 
 export default function ExplorePage() {
@@ -198,8 +198,12 @@ export default function ExplorePage() {
                   <p className="text-sm font-semibold text-white">{cat.name}</p>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-[10px] text-white/40">{cat.count} live</span>
-                    <span className="text-[10px] text-white/20">·</span>
-                    <span className="text-[10px] text-white/40">{cat.viewers} watching</span>
+                    {cat.viewers && (
+                      <>
+                        <span className="text-[10px] text-white/20">·</span>
+                        <span className="text-[10px] text-white/40">{cat.viewers} watching</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </Link>

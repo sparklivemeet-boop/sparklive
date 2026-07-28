@@ -67,6 +67,7 @@ export default function GlobalSearch() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -122,9 +123,14 @@ export default function GlobalSearch() {
         { signal: abortRef.current.signal, cacheTTL: 15000 }
       );
       setResults(data);
+      console.log('[Search] Results:', data);
     } catch (err: any) {
+      console.error('[Search] API Error:', err?.message || err);
       if (err?.statusCode !== 499) { // Not aborted
         setResults(null);
+        // Show error state for debugging
+        setSearchError(err?.message || 'Search request failed');
+        setTimeout(() => setSearchError(null), 5000);
       }
     } finally {
       setLoading(false);

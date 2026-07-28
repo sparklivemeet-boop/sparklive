@@ -17,6 +17,7 @@
     "@livekit/components-react": "^2.9.23",
     "@livekit/components-styles": "^1.2.0",
     "@livekit/protocol": "^1.50.4",
+    "@prisma/client": "^7.9.1",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "livekit-client": "^2.21.0",

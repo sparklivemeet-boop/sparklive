@@ -22,12 +22,12 @@ const categories = [
 ];
 
 const trending = [
-  { tag: '#SummerVibes', posts: '12.4K', trend: '🔥' },
-  { tag: '#MusicFestival', posts: '8.7K', trend: '↑' },
-  { tag: '#Gaming', posts: '45.2K', trend: '🔥' },
-  { tag: '#AIArt', posts: '12.3K', trend: '⭐' },
-  { tag: '#LiveMusic', posts: '5.6K', trend: '↑' },
-  { tag: '#TechTalk', posts: '7.8K', trend: '🔥' },
+  { tag: '#SummerVibes', posts: '', trend: '🔥' },
+  { tag: '#MusicFestival', posts: '', trend: '↑' },
+  { tag: '#Gaming', posts: '', trend: '🔥' },
+  { tag: '#AIArt', posts: '', trend: '⭐' },
+  { tag: '#LiveMusic', posts: '', trend: '↑' },
+  { tag: '#TechTalk', posts: '', trend: '🔥' },
 ];
 
 export default function ExplorePage() {
@@ -114,10 +114,10 @@ export default function ExplorePage() {
         </div>
         <div className="flex overflow-x-auto scrollbar-hide gap-4 pb-2">
           {[
-            { name: 'DJ Electronica', handle: '@djelectronica', category: 'Music', viewers: '12.4K', live: true, banner: 'from-[#ff007f]/20 via-[#7a00cc]/20 to-[#00d8ff]/10' },
-            { name: 'TechHub Live', handle: '@techhub', category: 'Tech', viewers: '8.7K', live: true, banner: 'from-[#00d8ff]/20 via-[#3b82f6]/20 to-[#7a00cc]/10' },
-            { name: 'ProGamerX', handle: '@progamerx', category: 'Gaming', viewers: '32.2K', live: true, banner: 'from-[#7a00cc]/20 via-[#ff007f]/20 to-[#ff3366]/10' },
-            { name: 'ArtisticMaya', handle: '@artisticmaya', category: 'Art', viewers: '5.6K', banner: 'from-emerald-500/20 via-[#00d8ff]/20 to-[#7a00cc]/10' },
+            { name: 'DJ Electronica', handle: '@djelectronica', category: 'Music', viewers: '', live: true, banner: 'from-[#ff007f]/20 via-[#7a00cc]/20 to-[#00d8ff]/10' },
+            { name: 'TechHub Live', handle: '@techhub', category: 'Tech', viewers: '', live: true, banner: 'from-[#00d8ff]/20 via-[#3b82f6]/20 to-[#7a00cc]/10' },
+            { name: 'ProGamerX', handle: '@progamerx', category: 'Gaming', viewers: '', live: true, banner: 'from-[#7a00cc]/20 via-[#ff007f]/20 to-[#ff3366]/10' },
+            { name: 'ArtisticMaya', handle: '@artisticmaya', category: 'Art', viewers: '', banner: 'from-emerald-500/20 via-[#00d8ff]/20 to-[#7a00cc]/10' },
           ].map((creator, i) => (
             <motion.div
               key={creator.handle}
@@ -227,9 +227,9 @@ export default function ExplorePage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[
-            { name: 'Music Lovers', members: '45.2K', online: '2.4K', icon: '🎵', gradient: 'from-pink-500/10 to-rose-500/10' },
-            { name: 'Tech Innovators', members: '32.1K', online: '1.8K', icon: '💻', gradient: 'from-cyan-500/10 to-blue-500/10' },
-            { name: 'Gaming Hub', members: '78.5K', online: '5.2K', icon: '🎮', gradient: 'from-purple-500/10 to-violet-500/10' },
+            { name: 'Music Lovers', members: '', online: '', icon: '🎵', gradient: 'from-pink-500/10 to-rose-500/10' },
+            { name: 'Tech Innovators', members: '', online: '', icon: '💻', gradient: 'from-cyan-500/10 to-blue-500/10' },
+            { name: 'Gaming Hub', members: '', online: '', icon: '🎮', gradient: 'from-purple-500/10 to-violet-500/10' },
           ].map((community, i) => (
             <motion.div
               key={community.name}
@@ -263,10 +263,10 @@ export default function ExplorePage() {
       >
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
           {[
-            { icon: Radio, label: 'Live Streams', value: '1.2K', color: 'text-red-400' },
-            { icon: Users, label: 'Active Creators', value: '8.5K', color: 'text-[#ff007f]' },
-            { icon: Eye, label: 'Total Views', value: '2.4M', color: 'text-[#7a00cc]' },
-            { icon: Zap, label: 'Avg. Watch Time', value: '24m', color: 'text-[#00d8ff]' },
+            { icon: Radio, label: 'Live Streams', value: '', color: 'text-red-400' },
+            { icon: Users, label: 'Active Creators', value: '', color: 'text-[#ff007f]' },
+            { icon: Eye, label: 'Total Views', value: '', color: 'text-[#7a00cc]' },
+            { icon: Zap, label: 'Avg. Watch Time', value: '', color: 'text-[#00d8ff]' },
           ].map((stat, i) => (
             <div key={stat.label}>
               <stat.icon size={20} className={cn('mx-auto mb-2', stat.color)} />

@@ -21,7 +21,7 @@ const textSizes = {
 const LOGO_PATH = '/branding/sparklive-logo.png';
 
 export default function SparkLiveLogo({
-  size = 18,
+  size = 36,
   className = '',
   variant = 'gradient',
   showText = false,
@@ -81,16 +81,16 @@ export function SparkLiveWordmark({ size = 'md', className, variant = 'gradient'
 // Sidebar-specific logo (compact using uploaded image)
 export function SparkLiveSidebarLogo({ className }: { className?: string }) {
   return (
-    <span className={cn('inline-flex items-center gap-2', className)}>
-      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FF2E8B] to-[#8B3DFF] flex items-center justify-center shadow-lg shadow-[#FF2E8B]/20">
+    <span className={cn('inline-flex items-center gap-3', className)}>
+      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF2E8B] to-[#8B3DFF] flex items-center justify-center shadow-lg shadow-[#FF2E8B]/20">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={LOGO_PATH}
           alt="SparkLive"
-          width={18}
-          height={18}
+          width={24}
+          height={24}
           className="object-contain"
-          style={{ width: 18, height: 18 }}
+          style={{ width: 24, height: 24 }}
         />
       </div>
       <div>
@@ -105,15 +105,15 @@ export function SparkLiveSidebarLogo({ className }: { className?: string }) {
 export function SparkLiveNavbarLogo({ className }: { className?: string }) {
   return (
     <span className={cn('inline-flex items-center gap-2', className)}>
-      <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#FF2E8B] to-[#8B3DFF] flex items-center justify-center">
+      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#FF2E8B] to-[#8B3DFF] flex items-center justify-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={LOGO_PATH}
           alt="SparkLive"
-          width={14}
-          height={14}
+          width={22}
+          height={22}
           className="object-contain"
-          style={{ width: 14, height: 14 }}
+          style={{ width: 22, height: 22 }}
         />
       </div>
       <span className="text-base font-bold text-white">SparkLive</span>

@@ -101,6 +101,60 @@ const calculateProfileStrength = (form: ProfileForm, avatarPreview: string | nul
   return Math.min(100, score);
 };
 
+const loadImage = (src: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new window.Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+async function cropImageFile(
+  file: File,
+  options: { zoom: number; offsetX: number; offsetY: number; width: number; height: number; prefix: string }
+) {
+  const src = URL.createObjectURL(file);
+  try {
+    const image = await loadImage(src);
+    const canvas = document.createElement('canvas');
+    canvas.width = options.width;
+    canvas.height = options.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+
+    const targetAspect = options.width / options.height;
+    const imageAspect = image.naturalWidth / image.naturalHeight;
+    let cropWidth = image.naturalWidth;
+    let cropHeight = image.naturalHeight;
+
+    if (imageAspect > targetAspect) {
+      cropHeight = image.naturalHeight / options.zoom;
+      cropWidth = cropHeight * targetAspect;
+    } else {
+      cropWidth = image.naturalWidth / options.zoom;
+      cropHeight = cropWidth / targetAspect;
+    }
+
+    cropWidth = Math.min(cropWidth, image.naturalWidth);
+    cropHeight = Math.min(cropHeight, image.naturalHeight);
+
+    const maxX = Math.max(0, image.naturalWidth - cropWidth);
+    const maxY = Math.max(0, image.naturalHeight - cropHeight);
+    const sourceX = clamp(maxX / 2 + (options.offsetX / 100) * maxX, 0, maxX);
+    const sourceY = clamp(maxY / 2 + (options.offsetY / 100) * maxY, 0, maxY);
+
+    ctx.drawImage(image, sourceX, sourceY, cropWidth, cropHeight, 0, 0, options.width, options.height);
+
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', 0.9));
+    if (!blob) return file;
+    return new File([blob], `${options.prefix}-${Date.now()}.webp`, { type: 'image/webp' });
+  } finally {
+    URL.revokeObjectURL(src);
+  }
+}
+
 export default function EditProfileModal({ open, onClose, onProfileUpdated }: EditProfileModalProps) {
   const { token } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -122,6 +176,10 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
   const [activeSection, setActiveSection] = useState('basic');
   const [profileStrength, setProfileStrength] = useState(0);
   const [avatarRotate, setAvatarRotate] = useState(0);
+  const [avatarZoom, setAvatarZoom] = useState(1);
+  const [avatarOffset, setAvatarOffset] = useState({ x: 0, y: 0 });
+  const [bannerZoom, setBannerZoom] = useState(1);
+  const [bannerOffset, setBannerOffset] = useState({ x: 0, y: 0 });
   const [showPlatformPicker, setShowPlatformPicker] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
 
@@ -184,6 +242,10 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
         setBioCharCount(newForm.bio.length);
         setAvatarPreview(p.avatarUrl || p.avatar_url || null);
         setBannerPreview(p.bannerUrl || p.banner_url || null);
+        setAvatarZoom(1);
+        setAvatarOffset({ x: 0, y: 0 });
+        setBannerZoom(1);
+        setBannerOffset({ x: 0, y: 0 });
       })
       .catch(() => setError('Failed to load profile'))
       .finally(() => setLoading(false));
@@ -238,6 +300,8 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setError('Must be JPEG, PNG or WebP'); return; }
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
+    setAvatarZoom(1);
+    setAvatarOffset({ x: 0, y: 0 });
     setError(null);
   };
 
@@ -248,11 +312,25 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setError('Must be JPEG, PNG or WebP'); return; }
     setBannerFile(file);
     setBannerPreview(URL.createObjectURL(file));
+    setBannerZoom(1);
+    setBannerOffset({ x: 0, y: 0 });
     setError(null);
   };
 
-  const removeAvatar = () => { setAvatarFile(null); setAvatarPreview(null); if (avatarInputRef.current) avatarInputRef.current.value = ''; };
-  const removeBanner = () => { setBannerFile(null); setBannerPreview(null); if (bannerInputRef.current) bannerInputRef.current.value = ''; };
+  const removeAvatar = () => {
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    setAvatarZoom(1);
+    setAvatarOffset({ x: 0, y: 0 });
+    if (avatarInputRef.current) avatarInputRef.current.value = '';
+  };
+  const removeBanner = () => {
+    setBannerFile(null);
+    setBannerPreview(null);
+    setBannerZoom(1);
+    setBannerOffset({ x: 0, y: 0 });
+    if (bannerInputRef.current) bannerInputRef.current.value = '';
+  };
 
   const handleSave = async () => {
     if (!token) return;
@@ -265,7 +343,15 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
       // Upload avatar if changed - uses proven uploadService with compression
       if (avatarFile) {
         setUploadingAvatar(true);
-        const result = await uploadAvatarService(avatarFile, token);
+        const croppedAvatar = await cropImageFile(avatarFile, {
+          zoom: avatarZoom,
+          offsetX: avatarOffset.x,
+          offsetY: avatarOffset.y,
+          width: 640,
+          height: 640,
+          prefix: 'avatar',
+        });
+        const result = await uploadAvatarService(croppedAvatar, token);
         setUploadingAvatar(false);
         if (!result.url) { setError(result.error || 'Failed to upload avatar.'); setSaving(false); return; }
         newAvatarUrl = result.url;
@@ -275,7 +361,15 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
       // Upload banner if changed - uses proven uploadService with compression
       if (bannerFile) {
         setUploadingBanner(true);
-        const result = await uploadBannerService(bannerFile, token);
+        const croppedBanner = await cropImageFile(bannerFile, {
+          zoom: bannerZoom,
+          offsetX: bannerOffset.x,
+          offsetY: bannerOffset.y,
+          width: 1800,
+          height: 600,
+          prefix: 'cover',
+        });
+        const result = await uploadBannerService(croppedBanner, token);
         setUploadingBanner(false);
         if (!result.url) { setError(result.error || 'Failed to upload banner.'); setSaving(false); return; }
         newBannerUrl = result.url;
@@ -697,7 +791,14 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
                               className="relative h-44 rounded-2xl overflow-hidden bg-gradient-to-r from-[#ff007f]/20 via-[#7a00cc]/20 to-[#00d8ff]/20 border border-white/[0.06] group"
                             >
                               {bannerPreview ? (
-                                <img src={bannerPreview} alt="Banner" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                <img
+                                  src={bannerPreview}
+                                  alt="Banner"
+                                  className="w-full h-full object-cover transition-transform duration-300"
+                                  style={{
+                                    transform: `scale(${bannerZoom}) translate(${bannerOffset.x * -0.08}%, ${bannerOffset.y * -0.08}%)`,
+                                  }}
+                                />
                               ) : (
                                 <div className="w-full h-full flex flex-col items-center justify-center gap-2">
                                   <Camera size={36} className="text-gray-700" />
@@ -727,6 +828,55 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
                                 )}
                               </div>
                             </motion.div>
+                            {bannerPreview && (
+                              <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-2xl border border-white/[0.05] bg-white/[0.02] p-3">
+                                <label className="space-y-1.5">
+                                  <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                                    <ZoomIn size={10} /> Cover zoom
+                                  </span>
+                                  <input
+                                    type="range"
+                                    min="1"
+                                    max="2.4"
+                                    step="0.05"
+                                    value={bannerZoom}
+                                    onChange={(e) => setBannerZoom(Number(e.target.value))}
+                                    disabled={!bannerFile}
+                                    className="w-full accent-[#ff007f] disabled:opacity-40"
+                                  />
+                                </label>
+                                <label className="space-y-1.5">
+                                  <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                                    <Sliders size={10} /> Horizontal
+                                  </span>
+                                  <input
+                                    type="range"
+                                    min="-50"
+                                    max="50"
+                                    step="1"
+                                    value={bannerOffset.x}
+                                    onChange={(e) => setBannerOffset(prev => ({ ...prev, x: Number(e.target.value) }))}
+                                    disabled={!bannerFile}
+                                    className="w-full accent-[#00d8ff] disabled:opacity-40"
+                                  />
+                                </label>
+                                <label className="space-y-1.5">
+                                  <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                                    <Sliders size={10} /> Vertical
+                                  </span>
+                                  <input
+                                    type="range"
+                                    min="-50"
+                                    max="50"
+                                    step="1"
+                                    value={bannerOffset.y}
+                                    onChange={(e) => setBannerOffset(prev => ({ ...prev, y: Number(e.target.value) }))}
+                                    disabled={!bannerFile}
+                                    className="w-full accent-[#7a00cc] disabled:opacity-40"
+                                  />
+                                </label>
+                              </div>
+                            )}
                             <input ref={bannerInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleBannerSelect} />
                             <p className="text-[9px] text-gray-600 mt-1.5">Recommended: 1500x500px • Max 10MB • JPEG, PNG or WebP</p>
                           </div>
@@ -755,8 +905,19 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
                                   }}
                                   transition={{ duration: 3, repeat: Infinity }}
                                 />
-                                <div className="w-28 h-28 rounded-full overflow-hidden border-2 border-white/[0.08] shadow-2xl relative">
-                                  <Avatar src={avatarPreview} alt="Avatar" size="2xl" className="w-full h-full" />
+                                <div className="w-28 h-28 rounded-full overflow-hidden border-2 border-white/[0.08] shadow-2xl relative bg-white/[0.03]">
+                                  {avatarPreview ? (
+                                    <img
+                                      src={avatarPreview}
+                                      alt="Avatar"
+                                      className="w-full h-full object-cover transition-transform duration-300"
+                                      style={{
+                                        transform: `scale(${avatarZoom}) translate(${avatarOffset.x * -0.08}%, ${avatarOffset.y * -0.08}%)`,
+                                      }}
+                                    />
+                                  ) : (
+                                    <Avatar src={avatarPreview} alt="Avatar" size="2xl" className="w-full h-full" />
+                                  )}
                                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Camera size={22} className="text-white" />
                                   </div>
@@ -783,13 +944,57 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
                                   </motion.button>
                                 )}
                                 <p className="text-[9px] text-gray-600">JPEG, PNG or WebP • Max 5MB</p>
-                                {/* Rotate hint */}
-                                <div className="flex items-center gap-1 text-[9px] text-gray-700">
-                                  <RefreshCw size={9} />
-                                  Hover to preview
-                                </div>
                               </div>
                             </div>
+                            {avatarPreview && (
+                              <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-2xl border border-white/[0.05] bg-white/[0.02] p-3">
+                                <label className="space-y-1.5">
+                                  <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                                    <ZoomIn size={10} /> Avatar zoom
+                                  </span>
+                                  <input
+                                    type="range"
+                                    min="1"
+                                    max="2.8"
+                                    step="0.05"
+                                    value={avatarZoom}
+                                    onChange={(e) => setAvatarZoom(Number(e.target.value))}
+                                    disabled={!avatarFile}
+                                    className="w-full accent-[#ff007f] disabled:opacity-40"
+                                  />
+                                </label>
+                                <label className="space-y-1.5">
+                                  <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                                    <Sliders size={10} /> Horizontal
+                                  </span>
+                                  <input
+                                    type="range"
+                                    min="-50"
+                                    max="50"
+                                    step="1"
+                                    value={avatarOffset.x}
+                                    onChange={(e) => setAvatarOffset(prev => ({ ...prev, x: Number(e.target.value) }))}
+                                    disabled={!avatarFile}
+                                    className="w-full accent-[#00d8ff] disabled:opacity-40"
+                                  />
+                                </label>
+                                <label className="space-y-1.5">
+                                  <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                                    <Sliders size={10} /> Vertical
+                                  </span>
+                                  <input
+                                    type="range"
+                                    min="-50"
+                                    max="50"
+                                    step="1"
+                                    value={avatarOffset.y}
+                                    onChange={(e) => setAvatarOffset(prev => ({ ...prev, y: Number(e.target.value) }))}
+                                    disabled={!avatarFile}
+                                    className="w-full accent-[#7a00cc] disabled:opacity-40"
+                                  />
+                                </label>
+                              </div>
+                            )}
                             <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarSelect} />
                           </div>
                         </div>

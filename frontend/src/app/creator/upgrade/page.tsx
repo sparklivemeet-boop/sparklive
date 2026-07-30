@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
-import { getSubscriptionPlans, subscribeToPlan, type SubscriptionPlan } from '@/lib/verificationApi';
+import { getSubscriptionPlans, getVerificationStatus, subscribeToPlan, type SubscriptionPlan, type VerificationStatus } from '@/lib/verificationApi';
 import { Crown, ShieldCheck, Sparkles, BarChart3, DollarSign, HeadphonesIcon, Zap, Star, Check, ChevronRight, Loader2, Clock, Users, Radio, TrendingUp, Gift, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -34,27 +34,42 @@ export default function CreatorUpgradePage() {
   const { user, token, isLoading } = useAuth();
   const router = useRouter();
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [verificationStatus, setVerificationStatus] = useState<VerificationStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [statusLoading, setStatusLoading] = useState(true);
   const [subscribing, setSubscribing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [billing, setBilling] = useState<'monthly' | 'annual'>('annual');
 
   useEffect(() => {
-    if (!token) return;
-    loadPlans();
+    if (!token) {
+      setPlans([]);
+      setVerificationStatus(null);
+      setLoading(false);
+      setStatusLoading(false);
+      return;
+    }
+
+    loadData();
   }, [token]);
 
-  const loadPlans = async () => {
+  const loadData = async () => {
     if (!token) return;
     setLoading(true);
+    setStatusLoading(true);
     try {
-      const data = await getSubscriptionPlans(token);
-      setPlans(data);
+      const [plansData, statusData] = await Promise.all([
+        getSubscriptionPlans(token),
+        getVerificationStatus(token),
+      ]);
+      setPlans(plansData);
+      setVerificationStatus(statusData);
     } catch (err: any) {
-      setError(err.message || 'Failed to load plans');
+      setError(err.message || 'Failed to load creator plans');
     } finally {
       setLoading(false);
+      setStatusLoading(false);
     }
   };
 
@@ -64,6 +79,7 @@ export default function CreatorUpgradePage() {
     setError(null);
     try {
       await subscribeToPlan(token, { planId });
+      await loadData();
       setSuccess(true);
       setTimeout(() => {
         router.push('/creator');
@@ -158,6 +174,34 @@ export default function CreatorUpgradePage() {
             Unlock Creator Studio and premium creator tools by subscribing to SparkLive Creator.
           </motion.p>
 
+          {!statusLoading && verificationStatus && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="mx-auto mb-10 flex max-w-xl items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left"
+            >
+              <div className={cn(
+                'flex h-10 w-10 items-center justify-center rounded-full',
+                verificationStatus.hasGoldBadge
+                  ? 'bg-gradient-to-br from-amber-400 to-yellow-600'
+                  : 'bg-gradient-to-br from-blue-500 to-cyan-500'
+              )}>
+                {verificationStatus.hasGoldBadge ? <Crown size={18} className="text-white" /> : <Sparkles size={18} className="text-white" />}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">
+                  {verificationStatus.hasGoldBadge ? 'You already have Creator access' : 'You are one step away from Creator access'}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {verificationStatus.hasGoldBadge
+                    ? 'Your Gold badge and Creator Studio tools are active.'
+                    : 'Choose a plan below to unlock Creator Studio, premium analytics, and monetization features.'}
+                </p>
+              </div>
+            </motion.div>
+          )}
+
           {/* Badge Preview */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -185,7 +229,7 @@ export default function CreatorUpgradePage() {
       </section>
 
       {/* Pricing Cards */}
-      <section className="px-4 pb-16">
+      <section id="pricing" className="px-4 pb-16">
         <div className="max-w-5xl mx-auto">
           {error && (
             <motion.div
@@ -205,7 +249,11 @@ export default function CreatorUpgradePage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {plans.map((plan, index) => {
+              {plans.length === 0 ? (
+                <div className="md:col-span-3 rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center text-sm text-gray-400">
+                  Creator plans are not available right now. Please try again shortly.
+                </div>
+              ) : plans.map((plan, index) => {
                 const isPopular = plan.savings === '25%';
                 const isBestValue = plan.savings === '10%';
                 return (
@@ -264,8 +312,14 @@ export default function CreatorUpgradePage() {
                       </ul>
 
                       <button
-                        onClick={() => handleSubscribe(plan.id)}
-                        disabled={subscribing === plan.id}
+                        onClick={() => {
+                          if (verificationStatus?.hasGoldBadge) {
+                            router.push('/creator');
+                            return;
+                          }
+                          handleSubscribe(plan.id);
+                        }}
+                        disabled={subscribing === plan.id || (verificationStatus?.hasGoldBadge && !subscribing)}
                         className={cn(
                           'w-full py-3 rounded-2xl text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2',
                           isPopular
@@ -277,6 +331,11 @@ export default function CreatorUpgradePage() {
                           <>
                             <Loader2 size={14} className="animate-spin" />
                             Processing...
+                          </>
+                        ) : verificationStatus?.hasGoldBadge ? (
+                          <>
+                            Open Creator Studio
+                            <ChevronRight size={14} />
                           </>
                         ) : (
                           <>
@@ -422,11 +481,19 @@ export default function CreatorUpgradePage() {
             Join SparkLive Creator and unlock the full potential of your content.
           </p>
           <button
-            onClick={() => plans.length > 0 && handleSubscribe(plans[0].id)}
-            disabled={subscribing !== null}
+            onClick={() => {
+              if (verificationStatus?.hasGoldBadge) {
+                router.push('/creator');
+                return;
+              }
+              if (plans.length > 0) {
+                handleSubscribe(plans[0].id);
+              }
+            }}
+            disabled={subscribing !== null || (!verificationStatus?.hasGoldBadge && plans.length === 0)}
             className="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-bold shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30 transition-all"
           >
-            {subscribing ? 'Processing...' : 'Get Started'}
+            {subscribing ? 'Processing...' : verificationStatus?.hasGoldBadge ? 'Open Creator Studio' : 'Get Started'}
           </button>
         </motion.div>
       </section>

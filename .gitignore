@@ -151,3 +151,5 @@ backend/tmp_install/
 
 # Broken/null files
 nul)
+backend/prisma/backend/prisma/dev.db  
+backend/prisma/backend/prisma/dev.db-journal  

@@ -38,10 +38,10 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
-      { url: "/branding/sparklive-logo.png", type: "image/png" },
+      { url: "/branding/sparklive-icon.svg", type: "image/svg+xml" },
     ],
     apple: [
-      { url: "/branding/sparklive-logo.png", sizes: "512x512", type: "image/png" },
+      { url: "/branding/sparklive-icon.svg", sizes: "512x512", type: "image/svg+xml" },
     ],
   },
   openGraph: {
@@ -52,14 +52,14 @@ export const metadata: Metadata = {
     siteName: "SparkLive",
     locale: "en_US",
     images: [
-      { url: "/branding/sparklive-logo.png", width: 512, height: 512, alt: "SparkLive" },
+      { url: "/branding/sparklive-icon.svg", width: 512, height: 512, alt: "SparkLive" },
     ],
   },
   twitter: {
     card: "summary_large_image",
     title: "SparkLive | Where Every Connection Glows",
     description: "Premium social streaming, creator, and discovery platform.",
-    images: ["/branding/sparklive-logo.png"],
+    images: ["/branding/sparklive-icon.svg"],
   },
   alternates: {
     canonical: "https://sparkliveapp.xyz",

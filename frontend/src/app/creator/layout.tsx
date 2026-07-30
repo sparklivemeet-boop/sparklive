@@ -158,7 +158,7 @@ export default function CreatorLayout({ children }: { children: React.ReactNode 
           <Link href="/creator" className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center overflow-hidden shadow-lg shadow-pink-500/20">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/branding/sparklive-logo.png" alt="SparkLive" width={26} height={26} className="object-contain" style={{ width: 26, height: 26 }} />
+              <img src="/branding/sparklive-icon.svg" alt="SparkLive" width={26} height={26} className="object-contain" style={{ width: 26, height: 26 }} />
             </div>
             {sidebarOpen && <span className="font-bold text-white text-sm tracking-tight">SparkLive <span className="text-pink-400">Studio</span></span>}
           </Link>

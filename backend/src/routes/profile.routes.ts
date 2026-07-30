@@ -16,6 +16,8 @@ import {
   getPublicProfile,
   getPublicProfilePosts,
   getPublicProfileMedia,
+  getProfileFollowersByUsername,
+  getProfileFollowingByUsername,
   followUser,
   unfollowUser,
   // New Creator Hub endpoints
@@ -64,6 +66,8 @@ const upload = multer({
 router.get('/public/:username', getPublicProfile);
 router.get('/public/:username/posts', getPublicProfilePosts);
 router.get('/public/:username/media', getPublicProfileMedia);
+router.get('/public/:username/reels', getPublicProfileReels);
+router.get('/public/:username/livestreams', getPublicProfileLivestreams);
 
 // Auth required routes
 router.use(authenticateJWT);
@@ -93,6 +97,8 @@ router.get('/me/reels', getProfileReels);
 router.get('/me/livestreams', getProfileLivestreams);
 
 // Follow system
+router.get('/:username/followers', getProfileFollowersByUsername);
+router.get('/:username/following', getProfileFollowingByUsername);
 router.post('/:username/follow', followUser);
 router.delete('/:username/follow', unfollowUser);
 

@@ -13,7 +13,6 @@ interface BottomNavigationProps {
 const navItems = [
   { href: '/home', icon: Home, label: 'Home' },
   { href: '/discover', icon: Compass, label: 'Discover' },
-  { href: '/reels', icon: Film, label: 'Reels' },
   { href: '/notification', icon: Bell, label: 'Alerts' },
   { href: '/profile', icon: User, label: 'Profile' },
 ];

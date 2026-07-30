@@ -24,13 +24,15 @@ const VISIBILITY_OPTIONS = [
 
 interface CreatePostModalProps {
   open: boolean;
+  initialIntent?: 'post' | 'photo' | 'video' | 'story' | 'poll' | 'event';
   onClose: () => void;
 }
 
-export default function CreatePostModal({ open, onClose }: CreatePostModalProps) {
+export default function CreatePostModal({ open, initialIntent = 'post', onClose }: CreatePostModalProps) {
   const { user, token } = useAuth();
   const { closeAll } = useContentCreation();
   const [content, setContent] = useState('');
+  const [intent, setIntent] = useState(initialIntent);
   const [media, setMedia] = useState<MediaFile[]>([]);
   const [visibility, setVisibility] = useState<'public' | 'followers'>('public');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -42,13 +44,30 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
 
   const hasContent = content.trim().length > 0 || media.length > 0;
   const isOverLimit = content.length > MAX_CHARS;
+  const isUploadingMedia = media.some((item) => item.uploading || (!item.uploadedUrl && item.progress < 100 && !item.error));
+  const uploadSummary = media.length === 0
+    ? null
+    : media.every((item) => item.progress === 100 && !item.error)
+      ? { label: 'Ready to publish', tone: 'text-emerald-400' }
+      : isUploadingMedia
+        ? { label: 'Uploading media…', tone: 'text-amber-400' }
+        : { label: 'Upload needs attention', tone: 'text-red-400' };
+  const intentMeta = {
+    post: { title: 'Create Post', subtitle: 'Share a quick update with your audience.', placeholder: "What's on your mind?", submitLabel: 'Post' },
+    photo: { title: 'Share a Photo', subtitle: 'Add a moment with a caption and optional media.', placeholder: 'What is this photo about?', submitLabel: 'Share Photo' },
+    video: { title: 'Share a Video', subtitle: 'Upload a clip and tell people what it is.', placeholder: 'Describe your video...', submitLabel: 'Share Video' },
+    story: { title: 'Create a Story', subtitle: 'Post a quick, ephemeral update.', placeholder: 'What would you like to share right now?', submitLabel: 'Publish Story' },
+    poll: { title: 'Create a Poll', subtitle: 'Ask your audience something new.', placeholder: 'What question do you want to ask?', submitLabel: 'Publish Poll' },
+    event: { title: 'Create an Event', subtitle: 'Let followers know about your next moment.', placeholder: 'Describe the event...', submitLabel: 'Publish Event' },
+  }[intent];
 
   // Focus textarea when modal opens
   useEffect(() => {
     if (open) {
+      setIntent(initialIntent);
       setTimeout(() => textareaRef.current?.focus(), 100);
     }
-  }, [open]);
+  }, [open, initialIntent]);
 
   // Close on Escape
   useEffect(() => {
@@ -108,6 +127,11 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
     setError(null);
 
     try {
+      if (isUploadingMedia) {
+        setError('Please wait for media uploads to finish before publishing.');
+        return;
+      }
+
       const uploadedMediaUrls = media
         .filter((m) => m.uploadedUrl)
         .map((m) => m.uploadedUrl);
@@ -124,7 +148,7 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
     } finally {
       setIsSubmitting(false);
     }
-  }, [content, media, hasContent, isOverLimit, onClose, closeAll, token]);
+  }, [content, media, hasContent, isOverLimit, isUploadingMedia, onClose, closeAll, token]);
 
   const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value);
@@ -163,7 +187,10 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06] shrink-0">
                 <div className="flex items-center gap-3">
-                  <h2 className="text-lg font-bold text-white">Create Post</h2>
+                  <div>
+                    <h2 className="text-lg font-bold text-white">{intentMeta.title}</h2>
+                    <p className="text-[10px] text-gray-500">{intentMeta.subtitle}</p>
+                  </div>
                   {hasContent && (
                     <motion.span
                       initial={{ opacity: 0, scale: 0 }}
@@ -231,7 +258,7 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
                       ref={textareaRef}
                       value={content}
                       onChange={handleTextareaInput}
-                      placeholder="What's on your mind?"
+                      placeholder={intentMeta.placeholder}
                       className="w-full min-h-[140px] bg-transparent text-white text-base sm:text-lg placeholder-gray-600 resize-none focus:outline-none leading-relaxed"
                       maxLength={MAX_CHARS + 100}
                       aria-label="Post content"
@@ -243,6 +270,20 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
                     onMediaChange={setMedia}
                     maxFiles={10}
                   />
+
+                  {uploadSummary && (
+                    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className={cn('text-sm font-medium', uploadSummary.tone)}>{uploadSummary.label}</p>
+                          <p className="text-[11px] text-gray-500">{media.filter((item) => item.uploadedUrl).length} of {media.length} files ready</p>
+                        </div>
+                        <div className="rounded-full border border-white/[0.06] bg-white/[0.04] px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-gray-400">
+                          {media.length} file{media.length === 1 ? '' : 's'}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Emoji picker */}
                   <div className="relative" ref={emojiPickerRef}>
@@ -358,7 +399,7 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
 
                     <motion.button
                       onClick={handleSubmit}
-                      disabled={(!hasContent && media.length === 0) || isOverLimit || isSubmitting}
+                      disabled={(!hasContent && media.length === 0) || isOverLimit || isSubmitting || isUploadingMedia}
                       whileTap={{ scale: 0.97 }}
                       className={cn(
                         'flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-200',
@@ -376,7 +417,7 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
                       ) : (
                         <>
                           <Send size={16} />
-                          Post
+                          {intentMeta.submitLabel}
                         </>
                       )}
                     </motion.button>

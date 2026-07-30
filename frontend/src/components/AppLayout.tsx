@@ -53,7 +53,6 @@ const BottomNavigation = lazy(() => import('./BottomNavigation'));
 const mainNavItems = [
   { href: '/home', icon: Home, label: 'Home' },
   { href: '/discover', icon: Compass, label: 'Discover' },
-  { href: '/reels', icon: Film, label: 'Reels' },
   { href: '/live', icon: Video, label: 'Live' },
   { href: '/messages', icon: MessageCircle, label: 'Messages' },
   { href: '/notification', icon: Bell, label: 'Notifications' },

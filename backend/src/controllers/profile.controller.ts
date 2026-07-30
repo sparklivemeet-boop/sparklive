@@ -212,6 +212,32 @@ export const getPublicProfileMedia = async (req: Request, res: Response): Promis
   }
 };
 
+export const getProfileFollowersByUsername = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const username = getParamString(req.params.username);
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    const limit = parseLimit(req.query.limit, 20);
+    const followers = await userService.getFollowersByUsername(username, cursor, limit);
+    res.status(200).json(followers);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(404).json({ error: message });
+  }
+};
+
+export const getProfileFollowingByUsername = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const username = getParamString(req.params.username);
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    const limit = parseLimit(req.query.limit, 20);
+    const following = await userService.getFollowingByUsername(username, cursor, limit);
+    res.status(200).json(following);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(404).json({ error: message });
+  }
+};
+
 export const followUser = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const currentUserId = req.user?.userId;
@@ -220,8 +246,8 @@ export const followUser = async (req: AuthRequest, res: Response): Promise<void>
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    const follow = await userService.followUser(currentUserId, username);
-    res.status(200).json({ message: 'Followed successfully', follow });
+    const result = await userService.followUser(currentUserId, username);
+    res.status(200).json({ message: 'Followed successfully', ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     res.status(400).json({ error: message });
@@ -236,8 +262,8 @@ export const unfollowUser = async (req: AuthRequest, res: Response): Promise<voi
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    await userService.unfollowUser(currentUserId, username);
-    res.status(200).json({ message: 'Unfollowed successfully' });
+    const result = await userService.unfollowUser(currentUserId, username);
+    res.status(200).json({ message: 'Unfollowed successfully', ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     res.status(400).json({ error: message });

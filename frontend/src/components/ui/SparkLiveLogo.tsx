@@ -17,8 +17,8 @@ const textSizes = {
   lg: 'text-2xl',
 };
 
-// Official uploaded SparkLive logo - single source of truth
-const LOGO_PATH = '/branding/sparklive-logo.png';
+// Official SparkLive brand icon - single source of truth
+const LOGO_PATH = '/branding/sparklive-icon.svg';
 
 export default function SparkLiveLogo({
   size = 36,

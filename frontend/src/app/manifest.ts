@@ -11,9 +11,9 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: "#0a0a0f",
     theme_color: "#0a0a0f",
     icons: [
-      { src: "/branding/sparklive-logo.png", sizes: "any", type: "image/png" },
-      { src: "/branding/sparklive-logo.png", sizes: "512x512", type: "image/png" },
-      { src: "/branding/sparklive-logo.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
+      { src: "/branding/sparklive-icon.svg", sizes: "any", type: "image/svg+xml" },
+      { src: "/branding/sparklive-icon.svg", sizes: "512x512", type: "image/svg+xml" },
+      { src: "/branding/sparklive-icon.svg", sizes: "192x192", type: "image/svg+xml", purpose: "maskable" },
     ],
   };
 }

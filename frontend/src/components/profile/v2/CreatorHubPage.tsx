@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, useScroll, useTransform, useInView, AnimatePresence, animate } from 'framer-motion';
 import {
   Sparkles, Zap, Trophy, Crown, Activity, Target, TrendingUp, Eye,
@@ -23,9 +24,10 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
-import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/apiClient';
+import { apiGet, apiPost, apiDelete, invalidateCache } from '@/lib/apiClient';
 import { useToast } from '@/components/ui/Toast';
-import { uploadAvatar as uploadAvatarService, uploadBanner as uploadBannerService, validateUploadFile } from '@/lib/uploadService';
+import SharedEditProfileModal from '@/components/profile/EditProfileModal';
+import SharedGoLiveModal from '@/components/create/GoLiveModal';
 
 // ============================================================
 // TYPES
@@ -147,12 +149,80 @@ interface CreatorHubPageProps {
   username?: string;
 }
 
+const getNumber = (...values: unknown[]) => {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+  }
+  return 0;
+};
+
+const normalizeCreatorProfile = (rawProfile: any): CreatorProfile => {
+  const raw = rawProfile ?? {};
+
+  return {
+    id: raw.id || '',
+    username: raw.username || '',
+    fullName: raw.fullName ?? raw.full_name ?? '',
+    avatarUrl: raw.avatarUrl ?? raw.avatar_url ?? raw.avatar ?? null,
+    bannerUrl: raw.bannerUrl ?? raw.banner_url ?? null,
+    bio: raw.bio ?? '',
+    website: raw.website ?? null,
+    country: raw.country ?? null,
+    city: raw.city ?? null,
+    verified: raw.verified ?? false,
+    premium: raw.premium ?? false,
+    creatorCategory: raw.creatorCategory ?? raw.creator_category ?? null,
+    occupation: raw.occupation ?? null,
+    languages: raw.languages ?? [],
+    pronouns: raw.pronouns ?? null,
+    businessEmail: raw.businessEmail ?? raw.business_email ?? null,
+    theme: raw.theme ?? null,
+    featuredContent: raw.featuredContent ?? raw.featured_content ?? [],
+    socialLinks: raw.socialLinks ?? raw.social_links ?? [],
+    media: raw.media ?? [],
+    isOnline: raw.isOnline ?? raw.is_online ?? false,
+    lastActive: raw.lastActive ?? raw.last_active ?? null,
+    verificationType: raw.verificationType ?? raw.verification_type ?? null,
+    verificationStatus: raw.verificationStatus ?? raw.verification_status ?? null,
+    creatorMembership: raw.creatorMembership ?? raw.creator_membership ?? null,
+    loyaltyLevel: raw.loyaltyLevel ?? raw.loyalty_level ?? 1,
+    loyaltyTier: raw.loyaltyTier ?? raw.loyalty_tier ?? 'BRONZE',
+    loyaltyXp: raw.loyaltyXp ?? raw.loyalty_xp ?? 0,
+    currentStream: raw.currentStream ?? raw.current_stream ?? null,
+    counts: {
+      followers: getNumber(raw.counts?.followers, raw.followersCount, raw.followers_count),
+      following: getNumber(raw.counts?.following, raw.followingCount, raw.following_count),
+      posts: getNumber(raw.counts?.posts, raw.postsCount, raw.posts_count),
+      media: getNumber(raw.counts?.media, raw.mediaCount, raw.media_count),
+    },
+    stats: {
+      totalLikes: getNumber(raw.stats?.totalLikes, raw.totalLikes, raw.likesReceived, raw.likes_received),
+      totalComments: getNumber(raw.stats?.totalComments, raw.totalComments),
+      totalGifts: getNumber(raw.stats?.totalGifts, raw.totalGifts, raw.giftsReceived, raw.gifts_received),
+      totalViews: getNumber(raw.stats?.totalViews, raw.totalViews, raw.total_views),
+      totalStreams: getNumber(raw.stats?.totalStreams, raw.totalStreams, raw.streamsCount, raw.streams_count),
+      totalPosts: getNumber(raw.stats?.totalPosts, raw.totalPosts, raw.postsCount, raw.posts_count),
+      totalFollowers: getNumber(raw.stats?.totalFollowers, raw.totalFollowers, raw.followersCount, raw.followers_count),
+      totalFollowing: getNumber(raw.stats?.totalFollowing, raw.totalFollowing, raw.followingCount, raw.following_count),
+    },
+    wallet: {
+      coinBalance: getNumber(raw.wallet?.coinBalance, raw.coinBalance, raw.coin_balance),
+      earningsBalance: getNumber(raw.wallet?.earningsBalance, raw.earningsBalance, raw.earnings_balance),
+      lifetimeEarnings: getNumber(raw.wallet?.lifetimeEarnings, raw.lifetimeEarnings, raw.lifetime_earnings),
+      totalGiftsReceived: getNumber(raw.wallet?.totalGiftsReceived, raw.totalGiftsReceived, raw.total_gifts_received),
+    },
+    latestPosts: raw.latestPosts ?? raw.latest_posts ?? [],
+    joinedAt: raw.joinedAt ?? raw.joined_at ?? raw.createdAt ?? raw.created_at ?? new Date().toISOString(),
+  };
+};
+
 // ============================================================
 // MAIN COMPONENT
 // ============================================================
 
 export default function CreatorHubPage({ username }: CreatorHubPageProps) {
   const { token, user: authUser } = useAuth();
+  const router = useRouter();
   const { showToast } = useToast();
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -174,8 +244,6 @@ export default function CreatorHubPage({ username }: CreatorHubPageProps) {
   const [reels, setReels] = useState<any[]>([]);
   const [liveStreams, setLiveStreams] = useState<any[]>([]);
   const [media, setMedia] = useState<any[]>([]);
-  const [followers, setFollowers] = useState<any[]>([]);
-  const [following, setFollowing] = useState<any[]>([]);
   const [pinnedContent, setPinnedContent] = useState<any[]>([]);
 
   // UI states
@@ -188,7 +256,7 @@ export default function CreatorHubPage({ username }: CreatorHubPageProps) {
   const [showFollowingModal, setShowFollowingModal] = useState(false);
   const [followersList, setFollowersList] = useState<any[]>([]);
   const [followingList, setFollowingList] = useState<any[]>([]);
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [followPending, setFollowPending] = useState(false);
 
   // Track mouse for parallax
   useEffect(() => {
@@ -225,63 +293,7 @@ export default function CreatorHubPage({ username }: CreatorHubPageProps) {
         data = await apiGet<any>('/api/profiles/me', token);
       }
       const raw = data?.profile ?? data?.data ?? data ?? {};
-      
-      // Normalize profile data to handle different API response formats
-      const normalized: CreatorProfile = {
-        id: raw.id || '',
-        username: raw.username || '',
-        fullName: raw.fullName || raw.full_name || '',
-        avatarUrl: raw.avatarUrl || raw.avatar_url || raw.avatar || null,
-        bannerUrl: raw.bannerUrl || raw.banner_url || null,
-        bio: raw.bio || '',
-        website: raw.website || null,
-        country: raw.country || null,
-        city: raw.city || null,
-        verified: raw.verified || false,
-        premium: raw.premium || false,
-        creatorCategory: raw.creatorCategory || raw.creator_category || null,
-        occupation: raw.occupation || null,
-        languages: raw.languages || [],
-        pronouns: raw.pronouns || null,
-        businessEmail: raw.businessEmail || raw.business_email || null,
-        theme: raw.theme || null,
-        featuredContent: raw.featuredContent || raw.featured_content || [],
-        socialLinks: raw.socialLinks || raw.social_links || [],
-        media: raw.media || [],
-        isOnline: raw.isOnline || raw.is_online || false,
-        lastActive: raw.lastActive || raw.last_active || null,
-        verificationType: raw.verificationType || raw.verification_type || null,
-        verificationStatus: raw.verificationStatus || raw.verification_status || null,
-        creatorMembership: raw.creatorMembership || raw.creator_membership || null,
-        loyaltyLevel: raw.loyaltyLevel || raw.loyalty_level || 1,
-        loyaltyTier: raw.loyaltyTier || raw.loyalty_tier || 'BRONZE',
-        loyaltyXp: raw.loyaltyXp || raw.loyalty_xp || 0,
-        currentStream: raw.currentStream || raw.current_stream || null,
-        counts: {
-          followers: raw.counts?.followers || raw.followersCount || raw.followers_count || 0,
-          following: raw.counts?.following || raw.followingCount || raw.following_count || 0,
-          posts: raw.counts?.posts || raw.postsCount || raw.posts_count || 0,
-          media: raw.counts?.media || raw.mediaCount || raw.media_count || 0,
-        },
-        stats: {
-          totalLikes: raw.stats?.totalLikes || raw.totalLikes || raw.likesReceived || raw.likes_received || 0,
-          totalComments: raw.stats?.totalComments || raw.totalComments || 0,
-          totalGifts: raw.stats?.totalGifts || raw.totalGifts || raw.giftsReceived || raw.gifts_received || 0,
-          totalViews: raw.stats?.totalViews || raw.totalViews || raw.total_views || 0,
-          totalStreams: raw.stats?.totalStreams || raw.totalStreams || raw.streamsCount || raw.streams_count || 0,
-          totalPosts: raw.stats?.totalPosts || raw.totalPosts || raw.postsCount || raw.posts_count || 0,
-          totalFollowers: raw.stats?.totalFollowers || raw.totalFollowers || raw.followersCount || raw.followers_count || 0,
-          totalFollowing: raw.stats?.totalFollowing || raw.totalFollowing || raw.followingCount || raw.following_count || 0,
-        },
-        wallet: {
-          coinBalance: raw.wallet?.coinBalance || raw.coinBalance || raw.coin_balance || 0,
-          earningsBalance: raw.wallet?.earningsBalance || raw.earningsBalance || raw.earnings_balance || 0,
-          lifetimeEarnings: raw.wallet?.lifetimeEarnings || raw.lifetimeEarnings || raw.lifetime_earnings || 0,
-          totalGiftsReceived: raw.wallet?.totalGiftsReceived || raw.totalGiftsReceived || raw.total_gifts_received || 0,
-        },
-        latestPosts: raw.latestPosts || raw.latest_posts || [],
-        joinedAt: raw.joinedAt || raw.joined_at || raw.createdAt || raw.created_at || new Date().toISOString(),
-      };
+      const normalized = normalizeCreatorProfile(raw);
       
       setProfile(normalized);
 
@@ -438,84 +450,115 @@ export default function CreatorHubPage({ username }: CreatorHubPageProps) {
   const fetchFollowersList = useCallback(async () => {
     if (!token) return;
     try {
-      const data = await apiGet<any>('/api/profiles/me/followers', token);
+      const endpoint = username && !isOwnProfile
+        ? `/api/profiles/${username}/followers`
+        : '/api/profiles/me/followers';
+      const data = await apiGet<any>(endpoint, token);
       setFollowersList(data?.items || []);
     } catch {
       // Silently fail
     }
-  }, [token]);
+  }, [token, username, isOwnProfile]);
 
   // ===== FETCH FOLLOWING =====
   const fetchFollowingList = useCallback(async () => {
     if (!token) return;
     try {
-      const data = await apiGet<any>('/api/profiles/me/following', token);
+      const endpoint = username && !isOwnProfile
+        ? `/api/profiles/${username}/following`
+        : '/api/profiles/me/following';
+      const data = await apiGet<any>(endpoint, token);
       setFollowingList(data?.items || []);
     } catch {
       // Silently fail
     }
-  }, [token]);
+  }, [token, username, isOwnProfile]);
 
   // ===== FOLLOW / UNFOLLOW =====
   const handleFollow = useCallback(async () => {
-    if (!token || !username) return;
+    if (!token || !username || followPending) return;
+    const wasFollowing = isFollowing;
+    const delta = wasFollowing ? -1 : 1;
+    const currentUserFollowing = getNumber(
+      (authUser as any)?.followingCount,
+      (authUser as any)?.following_count,
+      (authUser as any)?.counts?.following
+    );
+    const updateOptimisticCounts = (amount: number) => {
+      setProfile(prev => prev ? {
+        ...prev,
+        counts: { ...prev.counts, followers: Math.max(0, prev.counts.followers + amount) },
+        stats: { ...prev.stats, totalFollowers: Math.max(0, prev.stats.totalFollowers + amount) },
+      } : prev);
+
+      window.dispatchEvent(new CustomEvent('sparklive:follow-state-changed', {
+        detail: {
+          username,
+          following: !wasFollowing,
+          optimistic: true,
+          counts: {
+            target: {
+              followers: Math.max(0, (profile?.counts.followers ?? 0) + amount),
+              following: profile?.counts.following ?? 0,
+            },
+            currentUser: {
+              following: Math.max(0, currentUserFollowing + amount),
+            },
+          },
+        },
+      }));
+    };
+
+    setFollowPending(true);
+    setIsFollowing(!wasFollowing);
+    updateOptimisticCounts(delta);
+    invalidateCache('api/profiles');
+    invalidateCache('api/auth');
+
     try {
-      if (isFollowing) {
-        await apiDelete(`/api/profiles/${username}/follow`, token);
-        setIsFollowing(false);
+      const response = wasFollowing
+        ? await apiDelete<any>(`/api/profiles/${username}/follow`, token)
+        : await apiPost<any>(`/api/profiles/${username}/follow`, {}, token);
+
+      const counts = response?.counts || response?.data?.counts;
+      if (counts?.target) {
         setProfile(prev => prev ? {
           ...prev,
-          counts: { ...prev.counts, followers: Math.max(0, prev.counts.followers - 1) },
-          stats: { ...prev.stats, totalFollowers: Math.max(0, prev.stats.totalFollowers - 1) },
+          counts: {
+            ...prev.counts,
+            followers: counts.target.followers ?? prev.counts.followers,
+            following: counts.target.following ?? prev.counts.following,
+          },
+          stats: {
+            ...prev.stats,
+            totalFollowers: counts.target.followers ?? prev.stats.totalFollowers,
+            totalFollowing: counts.target.following ?? prev.stats.totalFollowing,
+          },
         } : prev);
+      }
+
+      window.dispatchEvent(new CustomEvent('sparklive:follow-state-changed', {
+        detail: { username, following: !wasFollowing, counts, optimistic: false },
+      }));
+
+      if (wasFollowing) {
         showToast?.({ type: 'success', title: 'Unfollowed', message: `Unfollowed @${username}` });
       } else {
-        await apiPost(`/api/profiles/${username}/follow`, {}, token);
-        setIsFollowing(true);
-        setProfile(prev => prev ? {
-          ...prev,
-          counts: { ...prev.counts, followers: prev.counts.followers + 1 },
-          stats: { ...prev.stats, totalFollowers: prev.stats.totalFollowers + 1 },
-        } : prev);
         showToast?.({ type: 'success', title: 'Following', message: `Following @${username}` });
       }
     } catch (err: any) {
+      setIsFollowing(wasFollowing);
+      updateOptimisticCounts(-delta);
+      invalidateCache('api/profiles');
+      invalidateCache('api/auth');
+      window.dispatchEvent(new CustomEvent('sparklive:follow-state-changed', {
+        detail: { username, following: wasFollowing, rollback: true },
+      }));
       showToast?.({ type: 'error', title: 'Error', message: err.message });
+    } finally {
+      setFollowPending(false);
     }
-  }, [token, username, isFollowing, showToast]);
-
-  // ===== UPLOAD HANDLERS =====
-  const handleAvatarUpload = async (file: File) => {
-    if (!token) return;
-    const err = validateUploadFile(file, 'avatar');
-    if (err) { showToast?.({ type: 'error', title: 'Invalid file', message: err }); return; }
-    try {
-      const result = await uploadAvatarService(file, token);
-      if (result.url) {
-        setProfile((prev: any) => prev ? { ...prev, avatarUrl: result.url } : prev);
-        showToast?.({ type: 'success', title: 'Avatar updated', message: 'Profile photo updated' });
-        setTimeout(() => fetchProfile(), 500);
-      }
-    } catch (err: any) {
-      showToast?.({ type: 'error', title: 'Upload failed', message: err.message });
-    }
-  };
-
-  const handleBannerUpload = async (file: File) => {
-    if (!token) return;
-    const err = validateUploadFile(file, 'banner');
-    if (err) { showToast?.({ type: 'error', title: 'Invalid file', message: err }); return; }
-    try {
-      const result = await uploadBannerService(file, token);
-      if (result.url) {
-        setProfile((prev: any) => prev ? { ...prev, bannerUrl: result.url } : prev);
-        showToast?.({ type: 'success', title: 'Banner updated', message: 'Cover image updated' });
-        setTimeout(() => fetchProfile(), 500);
-      }
-    } catch (err: any) {
-      showToast?.({ type: 'error', title: 'Upload failed', message: err.message });
-    }
-  };
+  }, [token, username, followPending, isFollowing, showToast, profile?.counts.followers, profile?.counts.following, authUser]);
 
   const handleShareProfile = () => {
     if (navigator.share) {
@@ -533,12 +576,12 @@ export default function CreatorHubPage({ username }: CreatorHubPageProps) {
     fetchPosts();
     fetchReels();
     fetchLiveStreams();
+    fetchFollowersList();
+    fetchFollowingList();
     if (isOwnProfile) {
       fetchCreatorScore();
       fetchAnalytics();
       fetchWalletPreview();
-      fetchFollowersList();
-      fetchFollowingList();
     }
   }, [fetchProfile, fetchAchievements, fetchPosts, fetchReels, fetchLiveStreams, fetchCreatorScore, fetchAnalytics, fetchWalletPreview, fetchFollowersList, fetchFollowingList, isOwnProfile]);
 
@@ -637,7 +680,6 @@ export default function CreatorHubPage({ username }: CreatorHubPageProps) {
 
   const isGoldVerified = profile?.verificationType === 'gold' || profile?.verificationType === 'GOLD';
   const isVerified = profile?.verified || !!profile?.verificationType;
-  const categoryIcon = profile.creatorCategory ? getCategoryIcon(profile.creatorCategory) : null;
 
   return (
     <motion.div
@@ -670,31 +712,27 @@ export default function CreatorHubPage({ username }: CreatorHubPageProps) {
         />
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto">
+      <div className="relative z-10 max-w-6xl mx-auto">
         {/* ===== HERO COVER ===== */}
         <HeroCover
           bannerUrl={profile.bannerUrl}
-          isOwnProfile={isOwnProfile}
           isLive={!!profile.currentStream}
           viewerCount={profile.currentStream?.viewerCount || 0}
-          onBannerUpload={isOwnProfile ? handleBannerUpload : undefined}
         />
 
-        {/* ===== FLOATING PROFILE CARD ===== */}
-        <div className="relative px-4 sm:px-6 -mt-20 sm:-mt-24 md:-mt-28 lg:-mt-32">
-          <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 sm:gap-6">
+        {/* ===== PROFILE HEADER ===== */}
+        <div className="relative px-4 sm:px-6 -mt-14 sm:-mt-20 md:-mt-[88px]">
+          <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3 sm:gap-4">
             <FloatingProfileAvatar
               avatarUrl={profile.avatarUrl}
               username={profile.username}
-              isOwnProfile={isOwnProfile}
               isLive={!!profile.currentStream}
               isVerified={isVerified}
               isGoldVerified={isGoldVerified}
               level={profile.loyaltyLevel || 1}
-              onAvatarUpload={isOwnProfile ? handleAvatarUpload : undefined}
             />
 
-            <div className="flex-1 min-w-0 pt-2 sm:pt-0 sm:pb-4">
+            <div className="flex-1 min-w-0 pt-0 sm:pb-1">
               {/* ===== CREATOR SUMMARY ===== */}
               <CreatorSummary
                 fullName={profile.fullName}
@@ -712,93 +750,55 @@ export default function CreatorHubPage({ username }: CreatorHubPageProps) {
                 languages={profile.languages}
                 pronouns={profile.pronouns}
                 createdAt={profile.joinedAt}
-                creatorScore={creatorScore?.totalScore || 0}
               />
+
+              {/* ===== CREATOR STATISTICS ===== */}
+              <div className="mt-2 sm:mt-3">
+                <CreatorStatistics
+                  followers={profile.counts.followers}
+                  following={profile.counts.following}
+                  posts={profile.counts.posts}
+                  likes={profile.stats.totalLikes}
+                  onFollowersClick={() => { setShowFollowersModal(true); }}
+                  onFollowingClick={() => { setShowFollowingModal(true); }}
+                />
+              </div>
 
               {/* ===== ACTION BUTTONS ===== */}
               <ActionButtons
                 isOwnProfile={isOwnProfile}
                 isLive={!!profile.currentStream}
                 isFollowing={isFollowing}
+                followPending={followPending}
                 onFollow={handleFollow}
-                onMessage={() => showToast?.({ type: 'info', title: 'Messages', message: 'Messaging feature coming soon' })}
-                onSendSparkCoin={() => showToast?.({ type: 'info', title: 'Spark Coins', message: 'Send Spark Coins feature coming soon' })}
+                onMessage={() => router.push('/messages')}
+                onSendSparkCoin={() => router.push('/wallet')}
                 onShare={handleShareProfile}
                 onEditProfile={() => setEditModalOpen(true)}
                 onGoLive={() => setGoLiveModalOpen(true)}
-                onViewWallet={() => showToast?.({ type: 'info', title: 'Wallet', message: 'Wallet feature coming soon' })}
-                onViewAnalytics={() => showToast?.({ type: 'info', title: 'Analytics', message: 'Analytics feature coming soon' })}
-                onViewStudio={() => showToast?.({ type: 'info', title: 'Studio', message: 'Studio feature coming soon' })}
+                onViewWallet={() => router.push('/wallet')}
+                onViewAnalytics={() => router.push('/creator/analytics')}
+                onViewStudio={() => router.push('/creator')}
+                onViewSettings={() => router.push('/profile/settings')}
               />
             </div>
           </div>
         </div>
 
-        {/* ===== CREATOR STATISTICS ===== */}
-        <motion.div variants={fadeUpVariants} className="mt-6 px-4 sm:px-6">
-          <CreatorStatistics
-            followers={profile.counts.followers}
-            following={profile.counts.following}
-            posts={profile.counts.posts}
-            likes={profile.stats.totalLikes}
-            views={profile.stats.totalViews}
-            streams={profile.stats.totalStreams}
-            gifts={profile.stats.totalGifts}
-            onFollowersClick={() => { setShowFollowersModal(true); }}
-            onFollowingClick={() => { setShowFollowingModal(true); }}
+        {/* ===== FEATURED CONTENT ===== */}
+        <motion.div variants={fadeUpVariants} className="mt-3 px-4 sm:px-6">
+          <FeaturedContent
+            currentStream={profile.currentStream}
+            pinnedPosts={pinnedContent}
+            pinnedReels={reels.filter((reel: any) => reel.pinned || reel.isPinned)}
+            recentPosts={posts}
+            recentReels={reels}
+            recentMedia={media}
           />
         </motion.div>
 
-        {/* ===== CREATOR SCORE (OWNER ONLY) ===== */}
-        {isOwnProfile && creatorScore && (
-          <motion.div variants={fadeUpVariants} className="mt-6 px-4 sm:px-6">
-            <CreatorScoreCard score={creatorScore} />
-          </motion.div>
-        )}
-
-        {/* ===== ACHIEVEMENT BADGES ===== */}
-        {achievements.length > 0 && (
-          <motion.div variants={fadeUpVariants} className="mt-6 px-4 sm:px-6">
-            <AchievementBadges achievements={achievements} />
-          </motion.div>
-        )}
-
-        {/* ===== ANALYTICS DASHBOARD (OWNER ONLY) ===== */}
-        {isOwnProfile && analytics && (
-          <motion.div variants={fadeUpVariants} className="mt-6 px-4 sm:px-6">
-            <AnalyticsDashboard data={analytics} />
-          </motion.div>
-        )}
-
-        {/* ===== WALLET PREVIEW (OWNER ONLY) ===== */}
-        {isOwnProfile && walletPreview && (
-          <motion.div variants={fadeUpVariants} className="mt-6 px-4 sm:px-6">
-            <WalletPreviewCard data={walletPreview} />
-          </motion.div>
-        )}
-
-        {/* ===== FEATURED CONTENT ===== */}
-        {pinnedContent.length > 0 && (
-          <motion.div variants={fadeUpVariants} className="mt-6 px-4 sm:px-6">
-            <FeaturedContent items={pinnedContent} />
-          </motion.div>
-        )}
-
-        {/* ===== DIVIDER ===== */}
-        <motion.div variants={fadeUpVariants} className="my-8 px-4 sm:px-6">
-          <div className="flex items-center gap-4">
-            <div className="flex-1 h-[1px] bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
-              className="w-2 h-2 rounded-full bg-gradient-to-r from-[#ff007f] to-[#7a00cc] opacity-40"
-            />
-            <div className="flex-1 h-[1px] bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
-          </div>
-        </motion.div>
-
         {/* ===== TAB NAVIGATION ===== */}
-        <div className="px-4 sm:px-6">
+        <div className="mt-3 px-4 sm:px-6">
           <ProfileTabs
             activeTab={activeTab}
             onTabChange={setActiveTab}
@@ -816,7 +816,7 @@ export default function CreatorHubPage({ username }: CreatorHubPageProps) {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="mt-6"
+            className="mt-4"
           >
             {activeTab === 'posts' && (
               <PostsTab
@@ -849,21 +849,42 @@ export default function CreatorHubPage({ username }: CreatorHubPageProps) {
             )}
           </motion.div>
         </div>
+
+        <motion.div variants={fadeUpVariants} className="mt-3 px-4 sm:px-6">
+          <CreatorInsights
+            views={profile.stats.totalViews}
+            streams={profile.stats.totalStreams}
+            gifts={profile.stats.totalGifts}
+            creatorScore={isOwnProfile ? creatorScore : null}
+            achievements={achievements}
+            analytics={isOwnProfile ? analytics : null}
+            walletPreview={isOwnProfile ? walletPreview : null}
+          />
+        </motion.div>
       </div>
 
       {/* ===== MODALS ===== */}
       {editModalOpen && (
-        <EditProfileModal
+        <SharedEditProfileModal
           open={editModalOpen}
           onClose={() => setEditModalOpen(false)}
           onProfileUpdated={(updated: any) => {
-            setProfile(updated);
+            const rawUpdated = updated?.profile ?? updated?.data ?? updated;
+            setProfile(prev => normalizeCreatorProfile(prev ? {
+              ...prev,
+              ...rawUpdated,
+              counts: prev.counts,
+              stats: prev.stats,
+              wallet: prev.wallet,
+              latestPosts: prev.latestPosts,
+              currentStream: prev.currentStream,
+            } : rawUpdated));
             showToast?.({ type: 'success', title: 'Saved', message: 'Profile updated successfully' });
           }}
         />
       )}
       {goLiveModalOpen && (
-        <GoLiveModal
+        <SharedGoLiveModal
           open={goLiveModalOpen}
           onClose={() => setGoLiveModalOpen(false)}
         />
@@ -927,17 +948,15 @@ function formatTimeAgo(date: string | Date): string {
 // ============================================================
 
 function HeroCover({
-  bannerUrl, isOwnProfile, isLive, viewerCount, onBannerUpload,
+  bannerUrl, isLive, viewerCount,
 }: {
-  bannerUrl?: string; isOwnProfile: boolean; isLive: boolean;
-  viewerCount: number; onBannerUpload?: (file: File) => Promise<void>;
+  bannerUrl?: string; isLive: boolean;
+  viewerCount: number;
 }) {
   const bannerRef = useRef<HTMLDivElement>(null);
   const [bannerHover, setBannerHover] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
-  const bannerInputRef = useRef<HTMLInputElement>(null);
 
   const { scrollYProgress } = useScroll({
     target: bannerRef,
@@ -956,7 +975,7 @@ function HeroCover({
   return (
     <div
       ref={bannerRef}
-      className="relative h-56 sm:h-64 md:h-72 lg:h-80 xl:h-96 rounded-3xl overflow-hidden group mx-4 sm:mx-6 mt-4 sm:mt-6"
+      className="relative h-[208px] sm:h-[221px] md:h-[234px] lg:h-[247px] rounded-[1.25rem] overflow-hidden group mx-4 sm:mx-6 mt-4 sm:mt-6"
       onMouseMove={(e) => {
         const rect = bannerRef.current?.getBoundingClientRect();
         if (rect) setMousePos({ x: ((e.clientX - rect.left) / rect.width) * 100, y: ((e.clientY - rect.top) / rect.height) * 100 });
@@ -1012,7 +1031,7 @@ function HeroCover({
       <div className="absolute inset-0 bg-gradient-to-t from-[#07070d] via-[#07070d]/40 to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-r from-[#07070d]/50 via-transparent to-[#07070d]/30" />
       <div className="absolute inset-0 backdrop-blur-[1px] pointer-events-none" />
-      <div className="absolute inset-0 rounded-3xl ring-1 ring-inset ring-white/[0.04] pointer-events-none" />
+      <div className="absolute inset-0 rounded-[1.25rem] ring-1 ring-inset ring-white/[0.04] pointer-events-none" />
 
       {/* Live Badge */}
       <AnimatePresence>
@@ -1049,36 +1068,6 @@ function HeroCover({
         </div>
       </motion.div>
 
-      {/* Upload overlay */}
-      {isOwnProfile && onBannerUpload && (
-        <AnimatePresence>
-          {(bannerHover || uploading) && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/50 flex items-center justify-center z-30"
-            >
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => bannerInputRef.current?.click()}
-                disabled={uploading}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white/15 backdrop-blur-2xl border border-white/20 text-white text-sm font-medium hover:bg-white/25 transition-all disabled:opacity-50"
-              >
-                {uploading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
-                {uploading ? 'Uploading...' : 'Change Cover'}
-              </motion.button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      )}
-      <input ref={bannerInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={async (e) => {
-        const file = e.target.files?.[0];
-        if (!file || !onBannerUpload) return;
-        setUploading(true);
-        try { await onBannerUpload(file); } finally { setUploading(false); if (bannerInputRef.current) bannerInputRef.current.value = ''; }
-      }} />
     </div>
   );
 }
@@ -1088,18 +1077,16 @@ function HeroCover({
 // ============================================================
 
 function FloatingProfileAvatar({
-  avatarUrl, username, isOwnProfile, isLive, isVerified, isGoldVerified, level, onAvatarUpload,
+  avatarUrl, username, isLive, isVerified, isGoldVerified, level,
 }: {
-  avatarUrl?: string; username?: string; isOwnProfile: boolean; isLive: boolean;
-  isVerified: boolean; isGoldVerified: boolean; level: number; onAvatarUpload?: (file: File) => Promise<void>;
+  avatarUrl?: string; username?: string; isLive: boolean;
+  isVerified: boolean; isGoldVerified: boolean; level: number;
 }) {
   const [avatarHover, setAvatarHover] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <motion.div
-      className="relative shrink-0"
+      className="relative shrink-0 z-20"
       onMouseEnter={() => setAvatarHover(true)}
       onMouseLeave={() => setAvatarHover(false)}
       initial={{ scale: 0.6, opacity: 0, y: 40 }}
@@ -1112,9 +1099,9 @@ function FloatingProfileAvatar({
         transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
         style={{ background: isGoldVerified ? 'radial-gradient(circle, rgba(255,215,0,0.35) 0%, transparent 70%)' : 'radial-gradient(circle, rgba(255,0,127,0.3) 0%, rgba(124,58,237,0.3) 50%, rgba(0,216,255,0.3) 100%)' }}
       />
-      <div className="relative w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 lg:w-40 lg:h-40 rounded-full border-[3px] border-[#07070d] overflow-hidden shadow-2xl shadow-black/50">
+      <div className="relative w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 rounded-full border-[4px] border-[#07070d] overflow-hidden shadow-2xl shadow-black/50 bg-[#07070d] ring-1 ring-white/[0.06]">
         <img
-          src={avatarUrl || '/branding/sparklive-logo.png'}
+          src={avatarUrl || '/branding/sparklive-icon.svg'}
           alt={username || 'User'}
           className="w-full h-full object-cover"
         />
@@ -1157,27 +1144,6 @@ function FloatingProfileAvatar({
           </motion.div>
         )}
       </div>
-      {isOwnProfile && onAvatarUpload && (
-        <AnimatePresence>
-          {(avatarHover || uploading) && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 rounded-full bg-black/60 flex items-center justify-center cursor-pointer border-[3px] border-[#07070d] z-10"
-              onClick={() => avatarInputRef.current?.click()}
-            >
-              {uploading ? <Loader2 size={24} className="text-white animate-spin" /> : <Camera size={24} className="text-white" />}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      )}
-      <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={async (e) => {
-        const file = e.target.files?.[0];
-        if (!file || !onAvatarUpload) return;
-        setUploading(true);
-        try { await onAvatarUpload(file); } finally { setUploading(false); if (avatarInputRef.current) avatarInputRef.current.value = ''; }
-      }} />
     </motion.div>
   );
 }
@@ -1188,12 +1154,12 @@ function FloatingProfileAvatar({
 
 function CreatorSummary({
   fullName, username, bio, creatorCategory, isLive, isVerified, isGoldVerified,
-  level, city, country, website, occupation, languages, pronouns, createdAt, creatorScore,
+  level, city, country, website, occupation, languages, pronouns, createdAt,
 }: {
   fullName?: string; username?: string; bio?: string; creatorCategory?: string;
   isLive: boolean; isVerified: boolean; isGoldVerified: boolean; level: number;
   city?: string; country?: string; website?: string; occupation?: string;
-  languages?: string[]; pronouns?: string; createdAt?: string; creatorScore?: number;
+  languages?: string[]; pronouns?: string; createdAt?: string;
 }) {
   const [showFullBio, setShowFullBio] = useState(false);
   const categoryIcon = creatorCategory ? getCategoryIcon(creatorCategory) : null;
@@ -1204,11 +1170,11 @@ function CreatorSummary({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <motion.h1
-              className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white tracking-tight"
+              className="text-2xl sm:text-3xl md:text-[2rem] font-bold text-white tracking-tight leading-tight"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.3 }}
@@ -1239,7 +1205,7 @@ function CreatorSummary({
             </motion.div>
           </div>
 
-          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
             <p className="text-sm sm:text-base text-white/40 font-medium">@{username || 'user'}</p>
             {categoryIcon && (
               <span className="flex items-center gap-1 text-[11px] text-white/30 bg-white/[0.03] px-2 py-0.5 rounded-full">
@@ -1254,20 +1220,9 @@ function CreatorSummary({
         </div>
       </div>
 
-      {/* Score + Status */}
-      <div className="flex items-center gap-3 mt-3 flex-wrap">
-        {creatorScore !== undefined && creatorScore > 0 && (
-          <motion.div
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#ff007f]/10 to-[#7a00cc]/10 border border-[#ff007f]/15"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35 }}
-          >
-            <Sparkles size={14} className="text-[#ff007f]" />
-            <span className="text-xs font-semibold text-white/80">Creator Score <span className="text-[#ff007f]">{creatorScore}</span></span>
-          </motion.div>
-        )}
-        {isLive && (
+      {/* Status */}
+      {isLive && (
+        <div className="flex items-center gap-3 mt-3 flex-wrap">
           <motion.div
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20"
             initial={{ opacity: 0, scale: 0.8 }}
@@ -1277,8 +1232,8 @@ function CreatorSummary({
             <motion.span className="w-2 h-2 rounded-full bg-red-500" animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 1.5, repeat: Infinity }} />
             <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">LIVE</span>
           </motion.div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Bio */}
       {bio && (
@@ -1286,9 +1241,9 @@ function CreatorSummary({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="mt-3"
+          className="mt-2"
         >
-          <p className="text-sm sm:text-base text-white/60 max-w-2xl leading-relaxed">
+          <p className="text-sm sm:text-[15px] text-white/60 max-w-2xl leading-relaxed">
             {bio.length > 150 && !showFullBio ? `${bio.slice(0, 150)}...` : bio}
             {bio.length > 150 && (
               <button onClick={() => setShowFullBio(!showFullBio)} className="ml-1 text-[#00d8ff] hover:text-[#06f7ff] text-xs font-medium transition-colors">
@@ -1304,7 +1259,7 @@ function CreatorSummary({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.45 }}
-        className="flex flex-wrap items-center gap-3 sm:gap-4 mt-3"
+        className="flex flex-wrap items-center gap-2.5 sm:gap-3 mt-2.5"
       >
         {website && (
           <a href={website.startsWith('http') ? website : `https://${website}`} target="_blank" rel="noopener noreferrer"
@@ -1347,41 +1302,60 @@ function CreatorSummary({
 // ============================================================
 
 function ActionButtons({
-  isOwnProfile, isLive, isFollowing, onFollow, onMessage, onSendSparkCoin,
-  onShare, onEditProfile, onGoLive, onViewWallet, onViewAnalytics, onViewStudio,
+  isOwnProfile, isLive, isFollowing, followPending, onFollow, onMessage, onSendSparkCoin,
+  onShare, onEditProfile, onGoLive, onViewWallet, onViewAnalytics, onViewStudio, onViewSettings,
 }: {
-  isOwnProfile: boolean; isLive: boolean; isFollowing: boolean;
+  isOwnProfile: boolean; isLive: boolean; isFollowing: boolean; followPending?: boolean;
   onFollow?: () => void; onMessage?: () => void; onSendSparkCoin?: () => void;
   onShare?: () => void; onEditProfile?: () => void; onGoLive?: () => void;
-  onViewWallet?: () => void; onViewAnalytics?: () => void; onViewStudio?: () => void;
+  onViewWallet?: () => void; onViewAnalytics?: () => void; onViewStudio?: () => void; onViewSettings?: () => void;
 }) {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   if (isOwnProfile) {
     return (
-      <div className="flex items-center gap-2 flex-wrap mt-4">
+      <div className="flex items-center gap-1.5 flex-wrap mt-2">
         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onEditProfile}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/15 text-white text-sm font-medium hover:bg-white/20 transition-all shadow-lg">
-          <Edit3 size={15} /> Edit Profile
-        </motion.button>
-        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onViewStudio}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/15 text-white text-sm font-medium hover:bg-white/20 transition-all">
-          <PenSquare size={15} /> Studio
-        </motion.button>
-        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onViewWallet}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/15 text-white text-sm font-medium hover:bg-white/20 transition-all">
-          <Wallet size={15} /> Wallet
-        </motion.button>
-        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onViewAnalytics}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/15 text-white text-sm font-medium hover:bg-white/20 transition-all">
-          <BarChart3 size={15} /> Analytics
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-xl border border-white/15 text-white text-xs font-medium hover:bg-white/18 transition-all">
+          <Edit3 size={13} /> Edit Profile
         </motion.button>
         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onGoLive}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white text-sm font-bold hover:shadow-xl hover:shadow-pink-500/25 transition-all">
-          <Radio size={15} /> {isLive ? 'Manage Stream' : 'Go Live'}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white text-xs font-bold hover:shadow-lg hover:shadow-pink-500/20 transition-all">
+          <Radio size={13} /> {isLive ? 'Manage Stream' : 'Go Live'}
         </motion.button>
+        <div className="relative">
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setShowMoreMenu(!showMoreMenu)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.08] backdrop-blur-xl border border-white/[0.12] text-white/75 text-xs font-medium hover:text-white hover:bg-white/[0.14] transition-all">
+            Manage <ChevronDown size={12} />
+          </motion.button>
+          <AnimatePresence>
+            {showMoreMenu && (
+              <motion.div
+                initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                className="absolute left-0 sm:right-0 sm:left-auto top-full mt-2 w-52 py-2 rounded-2xl bg-[#0e0e16]/96 backdrop-blur-2xl border border-white/10 shadow-2xl z-50"
+              >
+                {[
+                  { label: 'Creator Studio', icon: PenSquare, action: onViewStudio },
+                  { label: 'Wallet', icon: Wallet, action: onViewWallet },
+                  { label: 'Analytics', icon: BarChart3, action: onViewAnalytics },
+                  { label: 'Settings', icon: Settings, action: onViewSettings },
+                ].map(({ label, icon: Icon, action }) => (
+                  <button
+                    key={label}
+                    onClick={() => { setShowMoreMenu(false); action?.(); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/65 hover:text-white hover:bg-white/5 transition-colors"
+                  >
+                    <Icon size={14} /> {label}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
         <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onShare}
-          className="p-2.5 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/15 text-white/70 hover:text-white hover:bg-white/20 transition-all" aria-label="Share">
+          className="p-2 rounded-xl bg-white/[0.08] backdrop-blur-xl border border-white/[0.12] text-white/70 hover:text-white hover:bg-white/[0.14] transition-all" aria-label="Share">
           <Share2 size={16} />
         </motion.button>
       </div>
@@ -1389,27 +1363,27 @@ function ActionButtons({
   }
 
   return (
-    <div className="flex items-center gap-2 flex-wrap mt-4">
-      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onFollow}
-        className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold transition-all ${isFollowing ? 'bg-white/10 border border-white/20 text-white hover:bg-white/15' : 'bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white hover:shadow-xl hover:shadow-pink-500/25'}`}>
-        {isFollowing ? <UserCheck size={15} /> : <UserPlus size={15} />}
+    <div className="flex items-center gap-2 flex-wrap mt-3">
+      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onFollow} disabled={followPending}
+        className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-70 ${isFollowing ? 'bg-white/10 border border-white/20 text-white hover:bg-white/15' : 'bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white hover:shadow-lg hover:shadow-pink-500/20'}`}>
+        {followPending ? <Loader2 size={15} className="animate-spin" /> : isFollowing ? <UserCheck size={15} /> : <UserPlus size={15} />}
         {isFollowing ? 'Following' : 'Follow'}
       </motion.button>
       <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onMessage}
-        className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/15 text-white text-sm font-medium hover:bg-white/20 transition-all">
+        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 backdrop-blur-xl border border-white/15 text-white text-sm font-medium hover:bg-white/18 transition-all">
         <MessageCircle size={15} /> Message
       </motion.button>
       <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onSendSparkCoin}
-        className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-300 text-sm font-medium hover:from-amber-500/30 hover:to-orange-500/30 transition-all">
+        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-300 text-sm font-medium hover:from-amber-500/30 hover:to-orange-500/30 transition-all">
         <Gift size={15} /> <span className="hidden sm:inline">Send Spark</span> <Sparkles size={12} className="text-amber-400" />
       </motion.button>
       <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onShare}
-        className="p-2.5 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/15 text-white/70 hover:text-white hover:bg-white/20 transition-all" aria-label="Share">
+        className="p-2 rounded-xl bg-white/10 backdrop-blur-xl border border-white/15 text-white/70 hover:text-white hover:bg-white/18 transition-all" aria-label="Share">
         <Share2 size={16} />
       </motion.button>
       <div className="relative">
         <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setShowMoreMenu(!showMoreMenu)}
-          className="p-2.5 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/15 text-white/70 hover:text-white hover:bg-white/20 transition-all" aria-label="More options">
+          className="p-2 rounded-xl bg-white/10 backdrop-blur-xl border border-white/15 text-white/70 hover:text-white hover:bg-white/18 transition-all" aria-label="More options">
           <MoreHorizontal size={16} />
         </motion.button>
         <AnimatePresence>
@@ -1421,12 +1395,15 @@ function ActionButtons({
               className="absolute right-0 top-full mt-2 w-48 py-2 rounded-2xl bg-[#0e0e16]/95 backdrop-blur-2xl border border-white/10 shadow-2xl z-50"
             >
               {[
-                { label: 'Copy Profile Link', icon: Copy },
-                { label: 'Share via...', icon: ExternalLink },
-                { label: 'QR Code', icon: QrCode },
-                { label: 'Report', icon: Flag },
-              ].map(({ label, icon: Icon }) => (
-                <button key={label} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:text-white hover:bg-white/5 transition-colors">
+                { label: 'Copy Profile Link', icon: Copy, action: () => navigator.clipboard?.writeText(window.location.href) },
+                { label: 'Share Profile', icon: ExternalLink, action: onShare },
+                { label: 'Report Profile', icon: Flag, action: () => { window.location.href = '/privacy-center'; } },
+              ].map(({ label, icon: Icon, action }) => (
+                <button
+                  key={label}
+                  onClick={() => { setShowMoreMenu(false); action?.(); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+                >
                   <Icon size={13} /> {label}
                 </button>
               ))}
@@ -1446,80 +1423,64 @@ function AnimatedStatValue({ value }: { value: number }) {
   const ref = useRef<HTMLParagraphElement>(null);
   const isInView = useInView(ref, { once: true, margin: '-50px' });
   const [displayValue, setDisplayValue] = useState(0);
-  const hasAnimated = useRef(false);
+  const prevValue = useRef(0);
 
   useEffect(() => {
-    if (isInView && !hasAnimated.current) {
-      hasAnimated.current = true;
-      const controls = animate(0, value, {
-        duration: 1.5,
+    if (isInView) {
+      const controls = animate(prevValue.current, value, {
+        duration: 1.2,
         ease: [0.16, 1, 0.3, 1],
         onUpdate: (latest) => setDisplayValue(Math.round(latest)),
       });
+      prevValue.current = value;
       return () => controls.stop();
     }
   }, [isInView, value]);
 
   return (
-    <p ref={ref} className="text-2xl sm:text-3xl font-bold text-white tabular-nums tracking-tight">
+    <p ref={ref} className="text-xl sm:text-2xl font-bold text-white tabular-nums tracking-tight">
       {displayValue > 0 ? formatNumber(displayValue) : '0'}
     </p>
   );
 }
 
 function CreatorStatistics({
-  followers, following, posts, likes, views, streams, gifts,
+  followers, following, posts, likes,
   onFollowersClick, onFollowingClick,
 }: {
   followers: number; following: number; posts: number; likes: number;
-  views: number; streams: number; gifts: number;
   onFollowersClick?: () => void; onFollowingClick?: () => void;
 }) {
   const stats = [
-    { value: followers, label: 'Followers', color: 'pink', onClick: onFollowersClick },
-    { value: following, label: 'Following', color: 'purple', onClick: onFollowingClick },
-    { value: posts, label: 'Posts', color: 'blue' },
-    { value: likes, label: 'Likes', color: 'amber' },
-    { value: views, label: 'Views', color: 'cyan' },
-    { value: streams, label: 'Streams', color: 'emerald' },
-    { value: gifts, label: 'Gifts', color: 'amber' },
+    { value: followers, label: 'Followers', onClick: onFollowersClick },
+    { value: following, label: 'Following', onClick: onFollowingClick },
+    { value: posts, label: 'Posts' },
+    { value: likes, label: 'Likes' },
   ];
 
-  const colorMap: Record<string, { bg: string; border: string; text: string; iconBg: string }> = {
-    pink: { bg: 'bg-[#ff007f]/5', border: 'border-[#ff007f]/15', text: 'text-[#ff007f]', iconBg: 'bg-[#ff007f]/10' },
-    purple: { bg: 'bg-purple-500/5', border: 'border-purple-500/15', text: 'text-purple-400', iconBg: 'bg-purple-500/10' },
-    cyan: { bg: 'bg-[#00d8ff]/5', border: 'border-[#00d8ff]/15', text: 'text-[#00d8ff]', iconBg: 'bg-[#00d8ff]/10' },
-    emerald: { bg: 'bg-emerald-500/5', border: 'border-emerald-500/15', text: 'text-emerald-400', iconBg: 'bg-emerald-500/10' },
-    amber: { bg: 'bg-amber-500/5', border: 'border-amber-500/15', text: 'text-amber-400', iconBg: 'bg-amber-500/10' },
-    blue: { bg: 'bg-blue-500/5', border: 'border-blue-500/15', text: 'text-blue-400', iconBg: 'bg-blue-500/10' },
-  };
-
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
-      {stats.map((stat, i) => {
-        const c = colorMap[stat.color] || colorMap.pink;
-        return (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 + i * 0.05, duration: 0.4 }}
-            whileHover={{ y: -4, scale: 1.02 }}
-            onClick={stat.onClick}
-            className={cn(
-              'group relative rounded-2xl border p-4 sm:p-5 overflow-hidden transition-all duration-300',
-              c.bg, c.border,
-              stat.onClick ? 'cursor-pointer' : ''
-            )}
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.02] to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-            <div className="relative z-10">
-              <AnimatedStatValue value={stat.value} />
-              <p className="text-[11px] sm:text-xs text-white/40 font-medium mt-1 uppercase tracking-wider">{stat.label}</p>
-            </div>
-          </motion.div>
-        );
-      })}
+    <div className="flex flex-wrap items-end gap-4 sm:gap-8 md:gap-10 pt-1">
+      {stats.map((stat, i) => (
+        <motion.button
+          key={stat.label}
+          type="button"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08 + i * 0.04, duration: 0.3 }}
+          whileHover={{ y: -2 }}
+          onClick={stat.onClick}
+          aria-disabled={!stat.onClick}
+          className={cn(
+            'min-w-0 text-left transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-white/20 rounded-lg px-0.5 py-1',
+            stat.onClick ? 'cursor-pointer hover:text-white' : 'cursor-default'
+          )}
+        >
+          <AnimatedStatValue value={stat.value} />
+          <p className="mt-0.5 text-[9px] sm:text-[10px] font-medium uppercase tracking-[0.12em] text-white/[0.38]">
+            {stat.label}
+          </p>
+        </motion.button>
+      ))}
     </div>
   );
 }
@@ -1746,45 +1707,210 @@ function WalletPreviewCard({ data }: { data: WalletPreview }) {
 }
 
 // ============================================================
+// CREATOR INSIGHTS
+// ============================================================
+
+function CreatorInsights({
+  views, streams, gifts, creatorScore, achievements, analytics, walletPreview,
+}: {
+  views: number;
+  streams: number;
+  gifts: number;
+  creatorScore: CreatorScore | null;
+  achievements: Achievement[];
+  analytics: AnalyticsData | null;
+  walletPreview: WalletPreview | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const insightStats = [
+    { label: 'Views', value: views, icon: Eye },
+    { label: 'Streams', value: streams, icon: Radio },
+    { label: 'Gifts', value: gifts, icon: Gift },
+  ];
+
+  return (
+    <div className="border-t border-white/[0.06] pt-3">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between gap-4 py-2 text-left"
+        aria-expanded={open}
+      >
+        <div>
+          <p className="text-sm font-semibold text-white">Creator Insights</p>
+          <p className="text-xs text-white/40">Views, streams, gifts, and owner tools</p>
+        </div>
+        <motion.span animate={{ rotate: open ? 180 : 0 }} className="text-white/40">
+          <ChevronDown size={18} />
+        </motion.span>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="pt-2 space-y-3">
+              <div className="grid grid-cols-3 gap-3 max-w-lg">
+                {insightStats.map(({ label, value, icon: Icon }) => (
+                  <div key={label} className="min-w-0">
+                    <div className="flex items-center gap-2 text-white/40">
+                      <Icon size={14} />
+                      <span className="text-[10px] uppercase tracking-[0.12em]">{label}</span>
+                    </div>
+                    <p className="mt-1 text-lg sm:text-xl font-bold text-white tabular-nums">{formatNumber(value)}</p>
+                  </div>
+                ))}
+              </div>
+
+              {creatorScore && <CreatorScoreCard score={creatorScore} />}
+              {achievements.length > 0 && <AchievementBadges achievements={achievements} />}
+              {analytics && <AnalyticsDashboard data={analytics} />}
+              {walletPreview && <WalletPreviewCard data={walletPreview} />}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ============================================================
 // FEATURED CONTENT
 // ============================================================
 
-function FeaturedContent({ items }: { items: any[] }) {
-  if (items.length === 0) return null;
+function FeaturedContent({
+  currentStream, pinnedPosts, pinnedReels, recentPosts, recentReels, recentMedia,
+}: {
+  currentStream?: any;
+  pinnedPosts: any[];
+  pinnedReels: any[];
+  recentPosts: any[];
+  recentReels: any[];
+  recentMedia: any[];
+}) {
+  const cards: Array<{ key: string; label: string; title: string; meta?: string; icon: any; media?: string; tone: string }> = [];
+
+  if (currentStream) {
+    cards.push({
+      key: `live-${currentStream.id}`,
+      label: 'Current Live',
+      title: currentStream.title || 'Live now',
+      meta: `${formatNumber(currentStream.viewerCount || 0)} watching${currentStream.categoryName ? ` · ${currentStream.categoryName}` : ''}`,
+      icon: Radio,
+      media: currentStream.thumbnailUrl,
+      tone: 'text-red-300 bg-red-500/[0.12]',
+    });
+  }
+
+  const pinnedPost = pinnedPosts[0];
+  if (pinnedPost) {
+    cards.push({
+      key: `pinned-post-${pinnedPost.id}`,
+      label: 'Pinned Post',
+      title: pinnedPost.content || 'Pinned post',
+      meta: `${formatNumber(pinnedPost.likes?.length || pinnedPost.likes || 0)} likes · ${formatNumber(pinnedPost.comments?.length || pinnedPost.comments || 0)} comments`,
+      icon: PinIcon,
+      media: pinnedPost.mediaUrl,
+      tone: 'text-amber-300 bg-amber-500/[0.12]',
+    });
+  }
+
+  const pinnedReel = pinnedReels[0];
+  if (pinnedReel) {
+    cards.push({
+      key: `pinned-reel-${pinnedReel.id}`,
+      label: 'Pinned Reel',
+      title: pinnedReel.title || pinnedReel.description || 'Pinned reel',
+      meta: `${formatNumber(pinnedReel.views || 0)} views · ${formatNumber(pinnedReel.likes || 0)} likes`,
+      icon: Film,
+      media: pinnedReel.thumbnailUrl || pinnedReel.videoUrl,
+      tone: 'text-cyan-300 bg-cyan-500/[0.12]',
+    });
+  }
+
+  const recentPost = recentPosts.find((post: any) => !post.pinned) || recentPosts[0];
+  if (recentPost) {
+    cards.push({
+      key: `recent-post-${recentPost.id}`,
+      label: 'Recent Post',
+      title: recentPost.content || 'Recent post',
+      meta: recentPost.createdAt ? formatTimeAgo(recentPost.createdAt) : undefined,
+      icon: MessageCircle,
+      media: recentPost.mediaUrl,
+      tone: 'text-pink-300 bg-pink-500/[0.12]',
+    });
+  }
+
+  const recentReel = recentReels.find((reel: any) => !reel.pinned && !reel.isPinned) || recentReels[0];
+  if (recentReel) {
+    cards.push({
+      key: `recent-reel-${recentReel.id}`,
+      label: 'Recent Reel',
+      title: recentReel.title || recentReel.description || 'Recent reel',
+      meta: `${formatNumber(recentReel.views || 0)} views`,
+      icon: Play,
+      media: recentReel.thumbnailUrl || recentReel.videoUrl,
+      tone: 'text-purple-300 bg-purple-500/[0.12]',
+    });
+  }
+
+  const recentMediaItem = recentMedia[0];
+  if (recentMediaItem) {
+    cards.push({
+      key: `recent-media-${recentMediaItem.id}`,
+      label: 'Recent Media',
+      title: recentMediaItem.title || recentMediaItem.type || 'Recent media',
+      meta: recentMediaItem.createdAt ? formatTimeAgo(recentMediaItem.createdAt) : undefined,
+      icon: ImageIcon2,
+      media: recentMediaItem.thumbnail || recentMediaItem.url,
+      tone: 'text-emerald-300 bg-emerald-500/[0.12]',
+    });
+  }
+
+  if (cards.length === 0) return null;
 
   return (
-    <div className="rounded-2xl bg-white/[0.02] border border-white/[0.05] p-5 backdrop-blur-xl">
-      <div className="flex items-center gap-2 mb-4">
-        <Star size={14} className="text-amber-400" />
-        <h3 className="text-xs font-semibold text-white/40 uppercase tracking-[0.15em]">Featured Content</h3>
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Star size={14} className="text-amber-300" />
+        <h3 className="text-xs font-semibold text-white/[0.45] uppercase tracking-[0.15em]">Featured Content</h3>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {items.slice(0, 3).map((item, i) => (
+        {cards.slice(0, 6).map((item, i) => {
+          const Icon = item.icon;
+          return (
           <motion.div
-            key={item.id || i}
+            key={item.key}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3 hover:bg-white/[0.05] transition-colors group"
+            transition={{ delay: i * 0.06 }}
+            whileHover={{ y: -2 }}
+            className="rounded-2xl bg-white/[0.025] border border-white/[0.06] overflow-hidden hover:bg-white/[0.045] transition-colors group"
           >
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center shrink-0">
-                <PinIcon size={16} className="text-amber-400" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-white/70 line-clamp-2">{item.content || 'No content'}</p>
-                <div className="flex items-center gap-3 mt-1.5">
-                  <span className="flex items-center gap-1 text-[10px] text-white/30">
-                    <Heart size={10} /> {item.likes || 0}
-                  </span>
-                  <span className="flex items-center gap-1 text-[10px] text-white/30">
-                    <MessageCircle size={10} /> {item.comments || 0}
-                  </span>
+            <div className="flex min-h-[112px]">
+              {item.media && (
+                <div className="w-24 sm:w-28 shrink-0 bg-white/[0.04] overflow-hidden">
+                  <img src={item.media} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 </div>
+              )}
+              <div className="min-w-0 flex-1 p-3.5">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={cn('w-7 h-7 rounded-full flex items-center justify-center', item.tone)}>
+                    <Icon size={13} />
+                  </span>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/35">{item.label}</span>
+                </div>
+                <p className="text-sm font-medium text-white/[0.78] line-clamp-2">{item.title}</p>
+                {item.meta && <p className="mt-1.5 text-[10px] text-white/[0.32]">{item.meta}</p>}
               </div>
             </div>
           </motion.div>
-        ))}
+        )})}
       </div>
     </div>
   );
@@ -1833,7 +1959,7 @@ function ProfileTabs({
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className="relative flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-3 sm:py-4 text-xs sm:text-sm font-medium transition-all duration-200 outline-none whitespace-nowrap"
+          className="relative flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium transition-all duration-200 outline-none whitespace-nowrap"
               aria-selected={isActive}
               role="tab"
             >
@@ -2345,50 +2471,6 @@ function BookmarksTab() {
 // MODALS
 // ============================================================
 
-function EditProfileModal({ open, onClose, onProfileUpdated }: { open: boolean; onClose: () => void; onProfileUpdated: (profile: any) => void }) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="w-full max-w-lg rounded-3xl bg-[#0e0e16] border border-white/[0.08] p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold text-white">Edit Profile</h2>
-          <button onClick={onClose} className="p-2 rounded-xl bg-white/[0.04] text-white/40 hover:text-white hover:bg-white/[0.08] transition-all">
-            <X size={16} />
-          </button>
-        </div>
-        <p className="text-sm text-white/40 text-center py-8">Edit profile modal - coming soon</p>
-      </motion.div>
-    </div>
-  );
-}
-
-function GoLiveModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="w-full max-w-lg rounded-3xl bg-[#0e0e16] border border-white/[0.08] p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold text-white">Go Live</h2>
-          <button onClick={onClose} className="p-2 rounded-xl bg-white/[0.04] text-white/40 hover:text-white hover:bg-white/[0.08] transition-all">
-            <X size={16} />
-          </button>
-        </div>
-        <p className="text-sm text-white/40 text-center py-8">Go live modal - coming soon</p>
-      </motion.div>
-    </div>
-  );
-}
-
 function FollowersModal({ open, onClose, followers, title }: { open: boolean; onClose: () => void; followers: any[]; title: string }) {
   if (!open) return null;
   return (
@@ -2411,7 +2493,7 @@ function FollowersModal({ open, onClose, followers, title }: { open: boolean; on
           <div className="space-y-2">
             {followers.map((f: any, i: number) => (
               <div key={f.id || i} className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/[0.03] transition-colors">
-                <img src={f.avatar || f.avatarUrl || '/branding/sparklive-logo.png'} alt={f.username} className="w-10 h-10 rounded-full object-cover" />
+                <img src={f.avatar || f.avatarUrl || '/branding/sparklive-icon.svg'} alt={f.username} className="w-10 h-10 rounded-full object-cover" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-white truncate">{f.fullName || f.username}</p>
                   <p className="text-[10px] text-white/40">@{f.username}</p>

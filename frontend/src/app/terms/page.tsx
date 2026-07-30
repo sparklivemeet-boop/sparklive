@@ -25,7 +25,7 @@ export default function TermsPage() {
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/branding/sparklive-logo.png" alt="SparkLive" width={32} height={32} className="object-contain" style={{ width: 32, height: 32 }} />
+              <img src="/branding/sparklive-icon.svg" alt="SparkLive" width={32} height={32} className="object-contain" style={{ width: 32, height: 32 }} />
             </div>
             <span className="text-lg font-bold">
               Spark<span className="bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-purple-400">Live</span>

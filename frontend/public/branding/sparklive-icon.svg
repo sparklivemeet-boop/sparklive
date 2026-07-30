@@ -1,0 +1,20 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="flameGradient" x1="115" y1="90" x2="390" y2="380" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF4FA3"/>
+      <stop offset="0.45" stop-color="#E06FFF"/>
+      <stop offset="1" stop-color="#7F4DFF"/>
+    </linearGradient>
+    <radialGradient id="heartFill" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(256 236) rotate(90) scale(162)">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F3F4F6"/>
+    </radialGradient>
+  </defs>
+
+  <path d="M115 168C115 115 152 92 209 92C248 92 280 108 299 138C318 108 350 92 389 92C446 92 483 115 483 168C483 223 451 260 405 306C378 332 349 355 320 377C300 393 283 406 256 426C229 406 212 393 192 377C163 355 134 332 107 306C61 260 29 223 29 168C29 115 66 92 123 92C152 92 184 108 203 138" stroke="url(#flameGradient)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M256 227C256 227 220 187 191 164C166 144 120 149 118 198C117 225 129 245 154 267C182 292 217 316 256 344C295 316 330 292 358 267C383 245 395 225 394 198C392 149 346 144 321 164C292 187 256 227 256 227Z" fill="url(#heartFill)"/>
+  <path d="M170 117C174 105 185 85 195 73C205 60 216 49 230 42C241 36 254 34 266 35C257 51 255 70 259 84C264 103 281 117 296 126" stroke="url(#flameGradient)" stroke-width="14" stroke-linecap="round"/>
+  <path d="M292 110C313 103 334 90 343 75C353 58 351 38 336 28C321 18 296 26 281 44C268 59 264 77 266 92" stroke="url(#flameGradient)" stroke-width="14" stroke-linecap="round"/>
+  <path d="M248 420C194 382 148 334 125 295" stroke="url(#flameGradient)" stroke-width="12" stroke-linecap="round" opacity="0.35"/>
+  <path d="M370 283C391 314 412 347 430 369" stroke="url(#flameGradient)" stroke-width="12" stroke-linecap="round" opacity="0.32"/>
+</svg>

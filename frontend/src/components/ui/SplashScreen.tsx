@@ -60,7 +60,7 @@ export default function SplashScreen({ onComplete, duration = 2500 }: SplashScre
               {/* Official SparkLive Logo */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/branding/sparklive-logo.png"
+                src="/branding/sparklive-icon.svg"
                 alt="SparkLive"
                 width={80}
                 height={80}

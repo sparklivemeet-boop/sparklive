@@ -2,8 +2,10 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import CreatePostModal from '@/components/create/CreatePostModal';
+import GoLiveModal from '@/components/create/GoLiveModal';
 import {
   Plus,
   FileText,
@@ -154,19 +156,65 @@ const itemVariants = {
 
 export default function CreateHub({ open, onClose }: CreateHubProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [postModalOpen, setPostModalOpen] = useState(false);
+  const [goLiveModalOpen, setGoLiveModalOpen] = useState(false);
+  const [composerIntent, setComposerIntent] = useState<'post' | 'photo' | 'video' | 'story' | 'poll' | 'event'>('post');
+
+  const contextHint = pathname?.startsWith('/live')
+    ? { title: 'Go live', subtitle: 'Ready to broadcast to your audience?', recommendedIds: ['livestream', 'post', 'story'] as string[] }
+    : pathname?.startsWith('/profile') || pathname?.startsWith('/creator')
+      ? { title: 'Creator tools', subtitle: 'Share fresh momentum with your community.', recommendedIds: ['post', 'photo', 'livestream'] as string[] }
+      : pathname?.startsWith('/messages')
+        ? { title: 'Stay social', subtitle: 'Share a quick update or start a live moment.', recommendedIds: ['post', 'story', 'livestream'] as string[] }
+        : { title: 'Create', subtitle: 'What would you like to share?', recommendedIds: ['post', 'photo', 'livestream'] as string[] };
 
   const handleSelect = (option: typeof creationOptions[0]) => {
-    if (option.comingSoon) return;
     onClose();
-    // Navigate to the create page
-    router.push(option.path);
+
+    switch (option.id) {
+      case 'post':
+        setComposerIntent('post');
+        setPostModalOpen(true);
+        break;
+      case 'photo':
+        setComposerIntent('photo');
+        setPostModalOpen(true);
+        break;
+      case 'video':
+        setComposerIntent('video');
+        setPostModalOpen(true);
+        break;
+      case 'story':
+        setComposerIntent('story');
+        setPostModalOpen(true);
+        break;
+      case 'poll':
+        setComposerIntent('poll');
+        setPostModalOpen(true);
+        break;
+      case 'event':
+        setComposerIntent('event');
+        setPostModalOpen(true);
+        break;
+      case 'livestream':
+        setGoLiveModalOpen(true);
+        break;
+      case 'reel':
+        router.push('/reels');
+        break;
+      default:
+        router.push(option.path);
+        break;
+    }
   };
 
   return (
-    <AnimatePresence>
-      {open && (
-        <>
+    <>
+      <AnimatePresence>
+        {open && (
+          <>
           {/* Backdrop */}
           <motion.div
             className="fixed inset-0 z-[var(--z-modal-backdrop)] bg-black/60 backdrop-blur-sm"
@@ -193,8 +241,8 @@ export default function CreateHub({ open, onClose }: CreateHubProps) {
                     <Plus size={18} className="text-white" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-white">Create</h2>
-                    <p className="text-[10px] text-white/40">What would you like to share?</p>
+                    <h2 className="text-lg font-bold text-white">{contextHint.title}</h2>
+                    <p className="text-[10px] text-white/40">{contextHint.subtitle}</p>
                   </div>
                 </div>
                 <button
@@ -212,6 +260,7 @@ export default function CreateHub({ open, onClose }: CreateHubProps) {
                   {creationOptions.map((option, i) => {
                     const Icon = option.icon;
                     const isHovered = hoveredId === option.id;
+                    const isRecommended = contextHint.recommendedIds.includes(option.id);
 
                     return (
                       <motion.button
@@ -223,13 +272,12 @@ export default function CreateHub({ open, onClose }: CreateHubProps) {
                         onMouseEnter={() => setHoveredId(option.id)}
                         onMouseLeave={() => setHoveredId(null)}
                         onClick={() => handleSelect(option)}
-                        disabled={option.comingSoon}
                         className={cn(
                           'relative flex flex-col items-center gap-3 p-5 rounded-2xl text-center transition-all duration-300 group',
                           'bg-white/[0.02] border border-white/[0.06]',
                           'hover:bg-white/[0.04] hover:border-white/[0.1]',
                           isHovered && 'bg-white/[0.05] border-white/[0.12]',
-                          option.comingSoon && 'opacity-50 cursor-not-allowed'
+                          isRecommended && 'border-[#ff007f]/20 bg-[#ff007f]/5'
                         )}
                       >
                         {/* Icon container */}
@@ -247,10 +295,9 @@ export default function CreateHub({ open, onClose }: CreateHubProps) {
                           <p className="text-[10px] text-white/40 mt-0.5">{option.description}</p>
                         </div>
 
-                        {/* Coming soon badge */}
-                        {option.comingSoon && (
-                          <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-amber-500/10 text-[8px] font-bold text-amber-400 border border-amber-500/20">
-                            Soon
+                        {isRecommended && (
+                          <span className="absolute top-2 right-2 rounded-full border border-[#ff007f]/20 bg-[#ff007f]/10 px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.2em] text-[#ff79b8]">
+                            Suggested
                           </span>
                         )}
 
@@ -285,8 +332,12 @@ export default function CreateHub({ open, onClose }: CreateHubProps) {
               </div>
             </div>
           </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+          </>
+        )}
+      </AnimatePresence>
+
+      <CreatePostModal open={postModalOpen} initialIntent={composerIntent} onClose={() => setPostModalOpen(false)} />
+      <GoLiveModal open={goLiveModalOpen} onClose={() => setGoLiveModalOpen(false)} />
+    </>
   );
 }

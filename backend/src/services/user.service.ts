@@ -190,12 +190,33 @@ export class UserService {
       include: {
         profile: { include: { socialLinks: true, media: { orderBy: { createdAt: 'desc' }, take: 12 } } },
         _count: { select: { followers: true, following: true, posts: true } },
+        posts: {
+          orderBy: { createdAt: 'desc' },
+          take: 6,
+          include: {
+            likes: { select: { id: true } },
+            comments: { select: { id: true } },
+          },
+        },
       },
     });
 
     if (!user) {
       throw new Error('Profile not found');
     }
+
+    const currentStream = await prisma.liveStream.findFirst({
+      where: { hostId: user.id, active: true, status: 'LIVE' },
+      select: { id: true, title: true, viewerCount: true, thumbnailUrl: true, categoryName: true },
+    });
+
+    const [totalLikes, totalComments, totalGifts, totalViews, totalStreams] = await Promise.all([
+      prisma.postLike.count({ where: { post: { authorId: user.id } } }),
+      prisma.postComment.count({ where: { post: { authorId: user.id } } }),
+      prisma.giftTransaction.aggregate({ where: { receiverId: user.id }, _sum: { amount: true } }),
+      prisma.liveStream.aggregate({ where: { hostId: user.id }, _sum: { totalViewers: true } }),
+      prisma.liveStream.count({ where: { hostId: user.id } }),
+    ]);
 
     const isFollowing = currentUserId
       ? Boolean(
@@ -223,14 +244,40 @@ export class UserService {
       interests: user.profile?.interests || null,
       verified: user.verified,
       premium: user.premium,
+      creatorCategory: user.profile?.creatorCategory || null,
+      occupation: user.profile?.occupation || null,
+      languages: user.profile?.languages ? JSON.parse(user.profile.languages) : [],
+      pronouns: user.profile?.pronouns || null,
+      theme: user.profile?.theme || null,
+      featuredContent: user.profile?.featuredContent ? JSON.parse(user.profile.featuredContent) : [],
       socialLinks: user.profile?.socialLinks || [],
       media: user.profile?.media || [],
+      currentStream,
       counts: {
         followers: user._count.followers,
         following: user._count.following,
         posts: user._count.posts,
         media: user.profile?.media.length || 0,
       },
+      stats: {
+        totalLikes,
+        totalComments,
+        totalGifts: totalGifts._sum.amount || 0,
+        totalViews: totalViews._sum.totalViewers || 0,
+        totalStreams,
+        totalPosts: user._count.posts,
+        totalFollowers: user._count.followers,
+        totalFollowing: user._count.following,
+      },
+      latestPosts: user.posts.map((post: any) => ({
+        id: post.id,
+        content: post.content,
+        mediaUrl: post.mediaUrl,
+        pinned: post.pinned,
+        createdAt: post.createdAt,
+        likes: post.likes.length,
+        comments: post.comments.length,
+      })),
       isFollowing,
       joinedAt: user.createdAt,
     };
@@ -657,6 +704,31 @@ export class UserService {
     });
   }
 
+  private async getFollowRelationshipCounts(currentUserId: string, targetUserId: string) {
+    const [
+      targetFollowers,
+      targetFollowing,
+      currentUserFollowers,
+      currentUserFollowing,
+    ] = await Promise.all([
+      prisma.follow.count({ where: { followingId: targetUserId } }),
+      prisma.follow.count({ where: { followerId: targetUserId } }),
+      prisma.follow.count({ where: { followingId: currentUserId } }),
+      prisma.follow.count({ where: { followerId: currentUserId } }),
+    ]);
+
+    return {
+      target: {
+        followers: targetFollowers,
+        following: targetFollowing,
+      },
+      currentUser: {
+        followers: currentUserFollowers,
+        following: currentUserFollowing,
+      },
+    };
+  }
+
   async followUser(currentUserId: string, username: string) {
     const target = await prisma.user.findUnique({ where: { username } });
     if (!target) {
@@ -675,15 +747,25 @@ export class UserService {
       },
     });
     if (existing) {
-      return existing;
+      return {
+        follow: existing,
+        isFollowing: true,
+        counts: await this.getFollowRelationshipCounts(currentUserId, target.id),
+      };
     }
 
-    return prisma.follow.create({
+    const follow = await prisma.follow.create({
       data: {
         followerId: currentUserId,
         followingId: target.id,
       },
     });
+
+    return {
+      follow,
+      isFollowing: true,
+      counts: await this.getFollowRelationshipCounts(currentUserId, target.id),
+    };
   }
 
   async unfollowUser(currentUserId: string, username: string) {
@@ -701,7 +783,11 @@ export class UserService {
         followingId: target.id,
       },
     });
-    return { success: true };
+    return {
+      success: true,
+      isFollowing: false,
+      counts: await this.getFollowRelationshipCounts(currentUserId, target.id),
+    };
   }
 
   async uploadPhoto(userId: string, photoUrl: string) {
@@ -953,6 +1039,14 @@ export class UserService {
     return { items: followers.map(f => ({ ...f.follower, followedAt: f.createdAt })), nextCursor };
   }
 
+  async getFollowersByUsername(username: string, cursor?: string, limit: number = 20) {
+    const user = await prisma.user.findUnique({ where: { username } });
+    if (!user) {
+      throw new Error('Profile not found');
+    }
+    return this.getFollowers(user.id, cursor, limit);
+  }
+
   async getFollowing(userId: string, cursor?: string, limit: number = 20) {
     const following = await prisma.follow.findMany({
       where: { followerId: userId },
@@ -963,6 +1057,14 @@ export class UserService {
     });
     const nextCursor = following.length > limit ? following.pop()?.id : undefined;
     return { items: following.map(f => ({ ...f.following, followedAt: f.createdAt })), nextCursor };
+  }
+
+  async getFollowingByUsername(username: string, cursor?: string, limit: number = 20) {
+    const user = await prisma.user.findUnique({ where: { username } });
+    if (!user) {
+      throw new Error('Profile not found');
+    }
+    return this.getFollowing(user.id, cursor, limit);
   }
 
   async getPinnedContent(userId: string) {

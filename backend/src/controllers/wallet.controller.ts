@@ -3,6 +3,10 @@ import { walletService } from '../services';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { getParamString } from '../utils/params';
 
+// ============================================================================
+// WALLET & BALANCE
+// ============================================================================
+
 export const getWallet = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.userId;
@@ -27,54 +31,162 @@ export const getBalance = async (req: AuthRequest, res: Response): Promise<void>
   }
 };
 
-export const addCoins = async (req: AuthRequest, res: Response): Promise<void> => {
+// ============================================================================
+// COIN DEPOSITS
+// ============================================================================
+
+export const processDeposit = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.userId;
-    const { amount } = req.body;
+    const { amount, coins, paymentMethod, providerOrderId } = req.body;
     if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
-    if (!amount || amount <= 0) { res.status(400).json({ error: 'Valid amount is required' }); return; }
-    const wallet = await walletService.addCoins(userId, amount);
-    res.status(200).json({ message: 'Coins added successfully', wallet });
+    if (!amount || !coins || !paymentMethod || !providerOrderId) {
+      res.status(400).json({ error: 'Amount, coins, paymentMethod, and providerOrderId are required' });
+      return;
+    }
+    const wallet = await walletService.processDeposit(
+      userId, amount, coins, paymentMethod, providerOrderId, req.ip
+    );
+    res.status(200).json({ message: 'Deposit successful', wallet });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     res.status(400).json({ error: message });
   }
 };
 
-export const deductCoins = async (req: AuthRequest, res: Response): Promise<void> => {
+// ============================================================================
+// COIN TRANSFERS
+// ============================================================================
+
+export const transferCoins = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.userId;
-    const { amount } = req.body;
+    const { receiverId, amount, note, pin, otpCode } = req.body;
     if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
-    if (!amount || amount <= 0) { res.status(400).json({ error: 'Valid amount is required' }); return; }
-    const wallet = await walletService.deductCoins(userId, amount);
-    res.status(200).json({ message: 'Coins deducted successfully', wallet });
+    if (!receiverId || !amount) {
+      res.status(400).json({ error: 'Receiver ID and amount are required' });
+      return;
+    }
+    const result = await walletService.transferCoins(
+      userId, receiverId, amount, note, pin, otpCode, req.ip
+    );
+    res.status(200).json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     res.status(400).json({ error: message });
   }
 };
+
+// ============================================================================
+// WALLET PIN
+// ============================================================================
+
+export const setupPin = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const { pin } = req.body;
+    if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+    if (!pin) { res.status(400).json({ error: 'PIN is required' }); return; }
+    const result = await walletService.setupPin(userId, pin);
+    res.status(200).json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const updatePin = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const { oldPin, newPin } = req.body;
+    if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+    if (!oldPin || !newPin) { res.status(400).json({ error: 'Old PIN and new PIN are required' }); return; }
+    const result = await walletService.updatePin(userId, oldPin, newPin);
+    res.status(200).json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const verifyPin = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const { pin } = req.body;
+    if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+    if (!pin) { res.status(400).json({ error: 'PIN is required' }); return; }
+    const result = await walletService.verifyPin(userId, pin);
+    res.status(200).json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+// ============================================================================
+// TRANSFER LIMITS
+// ============================================================================
+
+export const updateTransferLimit = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const { dailyLimit, singleTxLimit, otpThreshold } = req.body;
+    if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+    const result = await walletService.updateTransferLimit(userId, { dailyLimit, singleTxLimit, otpThreshold });
+    res.status(200).json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+// ============================================================================
+// TRANSACTION HISTORY
+// ============================================================================
 
 export const getTransactionHistory = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.userId;
-    const limit = parseInt(req.query.limit as string) || 50;
     if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
-    const transactions = await walletService.getTransactionHistory(userId, limit);
-    res.status(200).json(transactions);
+    const { type, status, startDate, endDate, search, limit, offset } = req.query;
+    const result = await walletService.getTransactionHistory(userId, {
+      type: type as string,
+      status: status as string,
+      startDate: startDate ? new Date(startDate as string) : undefined,
+      endDate: endDate ? new Date(endDate as string) : undefined,
+      search: search as string,
+      limit: limit ? parseInt(limit as string) : 50,
+      offset: offset ? parseInt(offset as string) : 0,
+    });
+    res.status(200).json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     res.status(400).json({ error: message });
   }
 };
 
-export const getCoinTransactions = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getTransfersSent = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.userId;
     const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
     if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
-    const transactions = await walletService.getCoinTransactions(userId, limit);
-    res.status(200).json(transactions);
+    const result = await walletService.getTransfersSent(userId, limit, offset);
+    res.status(200).json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getTransfersReceived = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+    if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+    const result = await walletService.getTransfersReceived(userId, limit, offset);
+    res.status(200).json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     res.status(400).json({ error: message });
@@ -94,19 +206,23 @@ export const getGiftHistory = async (req: AuthRequest, res: Response): Promise<v
   }
 };
 
-export const saveWalletAddress = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getDeposits = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.userId;
-    const { address } = req.body;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
     if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
-    if (!address) { res.status(400).json({ error: 'Wallet address is required' }); return; }
-    const wallet = await walletService.saveUsdtWalletAddress(userId, address);
-    res.status(200).json({ message: 'USDT (BEP-20) wallet address saved successfully', wallet });
+    const result = await walletService.getDeposits(userId, limit, offset);
+    res.status(200).json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     res.status(400).json({ error: message });
   }
 };
+
+// ============================================================================
+// WITHDRAWALS (Disabled)
+// ============================================================================
 
 export const requestWithdrawal = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -117,7 +233,7 @@ export const requestWithdrawal = async (req: AuthRequest, res: Response): Promis
       res.status(400).json({ error: 'Amount and wallet address are required' });
       return;
     }
-    const withdrawal = await walletService.requestUsdtWithdrawal(userId, amount, walletAddress);
+    const withdrawal = await walletService.requestWithdrawal(userId, amount, walletAddress);
     res.status(201).json({ message: 'Withdrawal request created', withdrawal });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
@@ -138,39 +254,46 @@ export const getWithdrawals = async (req: AuthRequest, res: Response): Promise<v
   }
 };
 
-export const getWithdrawalStatus = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getWithdrawalHistory = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.userId;
-    const withdrawalId = getParamString(req.params.withdrawalId);
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
     if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
-    const withdrawal = await walletService.getWithdrawalStatus(withdrawalId, userId);
-    res.status(200).json(withdrawal);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Internal server error';
-    res.status(404).json({ error: message });
-  }
-};
-
-export const getPremiumStatus = async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.user?.userId;
-    if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
-    const status = await walletService.getPremiumStatus(userId);
-    res.status(200).json(status);
+    const result = await walletService.getWithdrawalHistory(userId, limit, offset);
+    res.status(200).json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     res.status(400).json({ error: message });
   }
 };
 
-export const buyPremium = async (req: AuthRequest, res: Response): Promise<void> => {
+// ============================================================================
+// WALLET ADDRESS
+// ============================================================================
+
+export const saveWalletAddress = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.userId;
-    const { plan, durationDays } = req.body;
+    const { address } = req.body;
     if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
-    if (!plan) { res.status(400).json({ error: 'Plan is required' }); return; }
-    const subscription = await walletService.buyPremium(userId, plan, durationDays);
-    res.status(201).json({ message: 'Premium subscription created', subscription });
+    if (!address) { res.status(400).json({ error: 'Wallet address is required' }); return; }
+    const wallet = await walletService.saveUsdtWalletAddress(userId, address);
+    res.status(200).json({ message: 'USDT (BEP-20) wallet address saved successfully', wallet });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+// ============================================================================
+// WALLET ANALYTICS
+// ============================================================================
+
+export const getWalletAnalytics = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const analytics = await walletService.getWalletAnalytics();
+    res.status(200).json(analytics);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     res.status(400).json({ error: message });

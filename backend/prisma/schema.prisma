@@ -117,6 +117,13 @@ model User {
   liveGiftEvents          LiveGiftEvent[]       @relation("EventSender")
   receivedLiveGifts       LiveGiftEvent[]       @relation("EventReceiver")
 
+  // Coin Transfers
+  sentTransfers     CoinTransfer[] @relation("SentTransfers")
+  receivedTransfers CoinTransfer[] @relation("ReceivedTransfers")
+
+  // Wallet Audit Logs
+  walletAuditLogs WalletAuditLog[]
+
   // Welcome Reward
   welcomeReward    WelcomeReward?
   coinTransactions CoinTransaction[]
@@ -1125,17 +1132,56 @@ model Wallet {
   coinBalance        Int                 @default(0)
   earningsBalance    Float               @default(0.0)
   lifetimeEarnings   Float               @default(0.0)
+  totalCoinsPurchased Int                @default(0)
+  totalCoinsReceived  Int                @default(0)
+  totalCoinsSent      Int                @default(0)
   totalGiftsSent     Int                 @default(0)
   totalGiftsReceived Int                 @default(0)
+  totalWithdrawn     Float               @default(0.0)
   bonusCoins         Int                 @default(0)
   lockedCoins        Int                 @default(0)
+  isFrozen           Boolean             @default(false)
+  frozenAt           DateTime?
+  frozenBy           String?
+  freezeReason       String?
   // Withdrawal wallet for USDT (BEP-20)
   usdtWalletAddress  String?
   userId             String              @unique
   user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions       WalletTransaction[] @relation("WalletTransactions")
+  pin                WalletPIN?
+  transferLimits     TransferLimit[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
+}
+
+model WalletPIN {
+  id        String   @id @default(cuid())
+  walletId  String   @unique
+  wallet    Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  pinHash   String
+  failedAttempts Int @default(0)
+  lockedUntil    DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([walletId])
+}
+
+model TransferLimit {
+  id              String   @id @default(cuid())
+  walletId        String
+  wallet          Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  dailyLimit      Int      @default(50000)
+  dailyUsed       Int      @default(0)
+  lastResetDate   DateTime @default(now())
+  singleTxLimit   Int      @default(10000)
+  otpThreshold    Int      @default(10000)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([walletId])
+  @@index([walletId])
 }
 
 model WalletTransaction {
@@ -1143,14 +1189,14 @@ model WalletTransaction {
   walletId    String?
   wallet      Wallet?  @relation("WalletTransactions", fields: [walletId], references: [id], onDelete: SetNull)
   userId      String
-  type        String
+  type        String   // DEPOSIT, TRANSFER_SENT, TRANSFER_RECEIVED, GIFT_SENT, GIFT_RECEIVED, WITHDRAWAL, REFUND, FEE, ADMIN_CREDIT, ADMIN_DEBIT
   amount      Float
   fee         Float    @default(0.0)
   balance     Float    @default(0.0)
-  status      String   @default("COMPLETED")
+  status      String   @default("COMPLETED") // PENDING, COMPLETED, FAILED, REVERSED
   description String?
   reference   String?
-  metadata    String?
+  metadata    String?  // JSON - stores extra info like recipientId, giftId, streamId, etc.
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
 
@@ -1161,6 +1207,7 @@ model WalletTransaction {
   @@index([userId, createdAt])
   @@index([userId, type, createdAt])
   @@index([status, createdAt])
+  @@index([walletId, type, createdAt])
 }
 
 model Withdrawal {
@@ -1172,7 +1219,6 @@ model Withdrawal {
   method        String    @default("USDT_BEP20")
   currency      String    @default("USDT")
   status        String    @default("PENDING")
-  // USDT (BEP-20) specific fields
   walletAddress String?
   cryptoNetwork String?   @default("BNB_SMART_CHAIN")
   adminNotes    String?
@@ -1187,6 +1233,118 @@ model Withdrawal {
   @@index([status, createdAt])
   @@index([userId, status, createdAt])
   @@index([method, status, createdAt])
+}
+
+model CoinTransfer {
+  id            String   @id @default(cuid())
+  senderId      String
+  receiverId    String
+  amount        Int
+  fee           Int      @default(0)
+  netAmount     Int
+  note          String?
+  status        String   @default("COMPLETED") // PENDING, COMPLETED, FAILED, REVERSED
+  otpVerified   Boolean  @default(false)
+  otpCode       String?
+  otpExpiresAt  DateTime?
+  ipAddress     String?
+  deviceFingerprint String?
+  sender        User     @relation("SentTransfers", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver      User     @relation("ReceivedTransfers", fields: [receiverId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([senderId, createdAt])
+  @@index([receiverId, createdAt])
+  @@index([senderId, receiverId, createdAt])
+  @@index([status, createdAt])
+  @@index([ipAddress, createdAt])
+}
+
+model WalletAuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String   // PIN_SETUP, PIN_VERIFY, PIN_FAILED, TRANSFER, DEPOSIT, WITHDRAWAL, FROZEN, UNFROZEN, LIMIT_CHANGE, OTP_SENT, OTP_VERIFIED
+  details   String?  // JSON
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@index([userId, action, createdAt])
+  @@index([ipAddress, createdAt])
+}
+
+model AdCampaign {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  mediaUrl      String
+  mediaType     String    @default("IMAGE") // IMAGE, VIDEO
+  ctaText       String    @default("Learn More")
+  ctaUrl        String?
+  ctaInternal   String?   // Internal page path
+  targetCountry String?   // JSON array or single country
+  priority      Int       @default(0)
+  status        String    @default("ACTIVE") // DRAFT, ACTIVE, PAUSED, EXPIRED, ARCHIVED
+  startDate     DateTime
+  endDate       DateTime?
+  maxImpressions Int?
+  maxClicks     Int?
+  createdBy     String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  impressions   AdImpression[]
+  clicks        AdClick[]
+
+  @@index([status, startDate, endDate])
+  @@index([status, priority])
+  @@index([createdBy])
+  @@index([targetCountry, status])
+  @@index([status, startDate, endDate, priority])
+}
+
+model AdImpression {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   AdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId     String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([campaignId, createdAt])
+  @@index([campaignId])
+  @@index([createdAt])
+}
+
+model AdClick {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   AdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId     String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([campaignId, createdAt])
+  @@index([campaignId])
+  @@index([createdAt])
+}
+
+model PlatformSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  type      String   @default("STRING") // STRING, NUMBER, BOOLEAN, JSON
+  description String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
 }
 
 model CreatorSubscription {

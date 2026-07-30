@@ -32,6 +32,7 @@ import channelRoutes from './routes/channel.routes';
 import groupRoutes from './routes/group.routes';
 import complianceRoutes from './routes/compliance.routes';
 import verificationRoutes from './routes/verification.routes';
+import adRoutes from './routes/ad.routes';
 import { aiRouter, registerAISocketHandlers } from './ai';
 import { analyticsRouter, registerAnalyticsSocketHandlers, analyticsEngine } from './analytics';
 import { handleChatSocket } from './sockets/chat.socket';
@@ -205,6 +206,9 @@ app.use('/api/compliance', complianceRoutes);
 
 // Verification & Creator Membership routes
 app.use('/api/verification', verificationRoutes);
+
+// Ad routes
+app.use('/api/ads', adRoutes);
 
 // ============================================================================
 // AI ROUTES

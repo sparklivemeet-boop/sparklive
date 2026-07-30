@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
-import { moderationService, walletService, userService, adminService } from '../services';
+import { moderationService, walletService, userService, adminService, adService } from '../services';
 import { AuthenticatedRequest } from '../security';
 
 // ============================================================================
@@ -732,6 +732,358 @@ export const deleteAnnouncement = async (req: AuthenticatedRequest, res: Respons
       message: 'Announcement deleted',
       announcementId,
     });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+// ============================================================================
+// WALLET ADMIN - NEW ENDPOINTS
+// ============================================================================
+
+export const freezeWallet = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { userId, reason } = req.body;
+    if (!userId || !reason) { res.status(400).json({ error: 'userId and reason are required' }); return; }
+    const wallet = await walletService.freezeWallet(userId, req.user!.userId, reason);
+    res.status(200).json({ message: 'Wallet frozen', wallet });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const unfreezeWallet = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.body;
+    if (!userId) { res.status(400).json({ error: 'userId is required' }); return; }
+    const wallet = await walletService.unfreezeWallet(userId, req.user!.userId);
+    res.status(200).json({ message: 'Wallet unfrozen', wallet });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const reverseTransaction = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { transactionId, reason } = req.body;
+    if (!transactionId || !reason) { res.status(400).json({ error: 'transactionId and reason are required' }); return; }
+    const result = await walletService.reverseTransaction(transactionId, req.user!.userId, reason);
+    res.status(200).json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const flagSuspiciousAccount = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { userId, reason } = req.body;
+    if (!userId || !reason) { res.status(400).json({ error: 'userId and reason are required' }); return; }
+    const result = await walletService.flagSuspiciousAccount(userId, req.user!.userId, reason);
+    res.status(200).json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getWalletAnalytics = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const analytics = await walletService.getWalletAnalytics();
+    res.status(200).json(analytics);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getAllTransactions = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+    const type = req.query.type as string;
+    const status = req.query.status as string;
+
+    const where: any = {};
+    if (type) where.type = type;
+    if (status) where.status = status;
+
+    const [transactions, total] = await Promise.all([
+      prisma.walletTransaction.findMany({
+        where,
+        include: { user: { select: { id: true, username: true, email: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.walletTransaction.count({ where }),
+    ]);
+
+    res.status(200).json({ transactions, total });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getAllDeposits = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const [deposits, total] = await Promise.all([
+      prisma.purchaseOrder.findMany({
+        include: { user: { select: { id: true, username: true, email: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.purchaseOrder.count(),
+    ]);
+
+    res.status(200).json({ deposits, total });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getAllTransfers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const [transfers, total] = await Promise.all([
+      prisma.coinTransfer.findMany({
+        include: {
+          sender: { select: { id: true, username: true, email: true } },
+          receiver: { select: { id: true, username: true, email: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.coinTransfer.count(),
+    ]);
+
+    res.status(200).json({ transfers, total });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getAllGifts = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const [gifts, total] = await Promise.all([
+      prisma.giftTransaction.findMany({
+        include: {
+          gift: true,
+          sender: { select: { id: true, username: true } },
+          receiver: { select: { id: true, username: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.giftTransaction.count(),
+    ]);
+
+    res.status(200).json({ gifts, total });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getAllWithdrawals = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const [withdrawals, total] = await Promise.all([
+      prisma.withdrawal.findMany({
+        include: { user: { select: { id: true, username: true, email: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.withdrawal.count(),
+    ]);
+
+    res.status(200).json({ withdrawals, total });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const searchUsers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const query = req.query.q as string;
+    if (!query) { res.status(400).json({ error: 'Search query is required' }); return; }
+
+    const users = await prisma.user.findMany({
+      where: {
+        OR: [
+          { username: { contains: query } },
+          { email: { contains: query } },
+          { fullName: { contains: query } },
+        ],
+      },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        fullName: true,
+        role: true,
+        status: true,
+        verified: true,
+        coins: true,
+        earnings: true,
+        createdAt: true,
+        wallet: {
+          select: {
+            coinBalance: true,
+            isFrozen: true,
+            totalCoinsPurchased: true,
+            totalCoinsSent: true,
+            totalGiftsSent: true,
+            totalGiftsReceived: true,
+          },
+        },
+      },
+      take: 20,
+    });
+
+    res.status(200).json(users);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+// ============================================================================
+// AD CAMPAIGN ADMIN
+// ============================================================================
+
+export const createCampaign = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const { name, description, mediaUrl, mediaType, ctaText, ctaUrl, ctaInternal,
+      targetCountry, priority, startDate, endDate, maxImpressions, maxClicks } = req.body;
+
+    if (!name || !mediaUrl || !startDate) {
+      res.status(400).json({ error: 'Name, mediaUrl, and startDate are required' });
+      return;
+    }
+
+    const campaign = await adService.createCampaign({
+      name, description, mediaUrl, mediaType, ctaText, ctaUrl, ctaInternal,
+      targetCountry, priority, startDate: new Date(startDate),
+      endDate: endDate ? new Date(endDate) : undefined,
+      maxImpressions, maxClicks, createdBy: userId!,
+    });
+
+    res.status(201).json({ message: 'Campaign created', campaign });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const updateCampaign = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { campaignId } = req.params;
+    const updates = req.body;
+    if (updates.startDate) updates.startDate = new Date(updates.startDate);
+    if (updates.endDate) updates.endDate = new Date(updates.endDate);
+    const campaign = await adService.updateCampaign(campaignId, updates);
+    res.status(200).json({ message: 'Campaign updated', campaign });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const deleteCampaign = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { campaignId } = req.params;
+    const result = await adService.deleteCampaign(campaignId);
+    res.status(200).json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getCampaign = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { campaignId } = req.params;
+    const campaign = await adService.getCampaign(campaignId);
+    res.status(200).json(campaign);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(404).json({ error: message });
+  }
+};
+
+export const getCampaigns = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const status = req.query.status as string;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+    const result = await adService.getCampaigns({ status, limit, offset });
+    res.status(200).json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const pauseCampaign = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { campaignId } = req.params;
+    const campaign = await adService.pauseCampaign(campaignId);
+    res.status(200).json({ message: 'Campaign paused', campaign });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const resumeCampaign = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { campaignId } = req.params;
+    const campaign = await adService.resumeCampaign(campaignId);
+    res.status(200).json({ message: 'Campaign resumed', campaign });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getCampaignAnalytics = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { campaignId } = req.params;
+    const analytics = await adService.getCampaignAnalytics(campaignId);
+    res.status(200).json(analytics);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getAllAdsAnalytics = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const analytics = await adService.getAllAdsAnalytics();
+    res.status(200).json(analytics);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     res.status(400).json({ error: message });

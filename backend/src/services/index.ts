@@ -41,3 +41,6 @@ export { verificationService, VerificationService } from "./verification.service
 
 // LiveKit streaming service
 export { liveKitService, LiveKitService } from "./livekit.service";
+
+// Ad service
+export { adService, AdService } from "./ad.service";

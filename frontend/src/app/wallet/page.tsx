@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet } from '@/lib/apiClient';
-import { Wallet, Plus, ArrowUpRight, ArrowDownLeft, Gift, Sparkles, Loader2, History, TrendingUp, Filter, Search, ChevronRight, AlertTriangle, Shield, Clock, ExternalLink, Ban, ShoppingBag, Coins, X } from 'lucide-react';
+import { Wallet, Plus, ArrowUpRight, ArrowDownLeft, Gift, Sparkles, Loader2, History, TrendingUp, Filter, Search, ChevronRight, AlertTriangle, Shield, Clock, ExternalLink, Ban, ShoppingBag, Coins, X, Copy, Check, CreditCard, BarChart3, Target, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import WalletBalanceCard from '@/components/wallet/WalletBalanceCard';
 import BuyCoinsModal from '@/components/wallet/BuyCoinsModal';

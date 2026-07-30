@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet } from '@/lib/apiClient';
-import { Sparkles, TrendingUp, Radio, Users, Hash, ChevronRight, Loader2, Compass } from 'lucide-react';
+import { Sparkles, TrendingUp, Radio, Users, Hash, ChevronRight, Loader2, Compass, Search, Flame, Music, Gamepad2, Palette, Globe, BookOpen, Camera, Star, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import DiscoverSearch from '@/components/discover/DiscoverSearch';
 import DiscoverHero from '@/components/discover/DiscoverHero';
@@ -13,6 +13,31 @@ import DiscoverSidebar from '@/components/discover/DiscoverSidebar';
 import LiveStreamsGrid from '@/components/discover/LiveStreamsGrid';
 import FloatingGoLiveButton from '@/components/profile/FloatingGoLiveButton';
 import PremiumGoLiveModal from '@/components/profile/PremiumGoLiveModal';
+import Avatar from '@/components/ui/Avatar';
+
+// Categories for exploration
+const categories = [
+  { id: 'trending', icon: Flame, label: 'Trending', color: 'from-red-500 to-orange-500' },
+  { id: 'music', icon: Music, label: 'Music', color: 'from-pink-500 to-purple-500' },
+  { id: 'gaming', icon: Gamepad2, label: 'Gaming', color: 'from-purple-500 to-indigo-500' },
+  { id: 'art', icon: Palette, label: 'Art', color: 'from-indigo-500 to-blue-500' },
+  { id: 'education', icon: BookOpen, label: 'Education', color: 'from-blue-500 to-cyan-500' },
+  { id: 'photography', icon: Camera, label: 'Photo', color: 'from-cyan-500 to-teal-500' },
+  { id: 'lifestyle', icon: Star, label: 'Lifestyle', color: 'from-teal-500 to-green-500' },
+  { id: 'global', icon: Globe, label: 'Global', color: 'from-green-500 to-yellow-500' },
+];
+
+// Trending hashtags
+const trendingHashtags = [
+  { tag: 'sparklive', posts: '12.5K' },
+  { tag: 'creatorlife', posts: '8.2K' },
+  { tag: 'livestream', posts: '6.7K' },
+  { tag: 'viral', posts: '5.1K' },
+  { tag: 'music', posts: '4.8K' },
+  { tag: 'gaming', posts: '4.2K' },
+  { tag: 'tutorial', posts: '3.9K' },
+  { tag: 'dance', posts: '3.5K' },
+];
 
 export default function DiscoverPage() {
   const { token } = useAuth();
@@ -57,10 +82,6 @@ export default function DiscoverPage() {
       transition: { delay: 0.1 + i * 0.05, duration: 0.4, ease: [0.16, 1, 0.3, 1] },
     }),
   };
-
-  // Only show sections when real data exists
-  const hasTrendingTopics = false; // Would come from backend trending API
-  const hasCategories = false; // Would come from backend categories API
 
   return (
     <>
@@ -112,7 +133,7 @@ export default function DiscoverPage() {
             </div>
             <h3 className="text-white/50 font-medium text-lg mb-1">Failed to load discover feed</h3>
             <p className="text-white/30 text-sm mb-4">{error}</p>
-            <button onClick={fetchData} className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white text-sm font-bold">
+            <button onClick={fetchData} className="btn-primary text-sm">
               Try Again
             </button>
           </div>
@@ -120,10 +141,71 @@ export default function DiscoverPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Content */}
             <div className="lg:col-span-2 space-y-8">
-              {/* Hero Carousel - only show if real data exists */}
+              {/* Categories Grid */}
+              <motion.section
+                custom={0}
+                variants={sectionVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                <div className="section-header">
+                  <h2 className="section-title">
+                    <Compass size={16} className="text-[#ff007f]" />
+                    Explore
+                  </h2>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {categories.map((cat) => {
+                    const Icon = cat.icon;
+                    return (
+                      <button
+                        key={cat.id}
+                        className="relative group overflow-hidden rounded-2xl p-4 bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] hover:border-white/[0.1] transition-all duration-300 text-left"
+                      >
+                        <div className={cn(
+                          'w-10 h-10 rounded-xl bg-gradient-to-br flex items-center justify-center mb-3 transition-transform duration-300 group-hover:scale-110',
+                          cat.color
+                        )}>
+                          <Icon size={18} className="text-white" />
+                        </div>
+                        <p className="text-sm font-semibold text-white">{cat.label}</p>
+                        <p className="text-[10px] text-white/30 mt-0.5">Explore {cat.label.toLowerCase()}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.section>
+
+              {/* Trending Hashtags */}
+              <motion.section
+                custom={1}
+                variants={sectionVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                <div className="section-header">
+                  <h2 className="section-title">
+                    <Hash size={16} className="text-[#06f7ff]" />
+                    Trending Hashtags
+                  </h2>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {trendingHashtags.map((item) => (
+                    <button
+                      key={item.tag}
+                      className="px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] hover:border-[#ff007f]/20 transition-all duration-200 group"
+                    >
+                      <span className="text-sm font-medium text-white/80 group-hover:text-white">#{item.tag}</span>
+                      <span className="text-[10px] text-white/30 ml-2">{item.posts} posts</span>
+                    </button>
+                  ))}
+                </div>
+              </motion.section>
+
+              {/* Hero Carousel */}
               {liveStreams.length > 0 && (
                 <motion.div
-                  custom={0}
+                  custom={2}
                   variants={sectionVariants}
                   initial="hidden"
                   animate="visible"
@@ -132,23 +214,28 @@ export default function DiscoverPage() {
                 </motion.div>
               )}
 
-              {/* Live Streams - only shows real data from backend */}
+              {/* Live Streams */}
               <motion.section
-                custom={1}
+                custom={3}
                 variants={sectionVariants}
                 initial="hidden"
                 animate="visible"
               >
-                <div className="flex items-center justify-between mb-4">
+                <div className="section-header">
                   <div className="flex items-center gap-2">
                     <Radio size={16} className="text-red-400" />
                     <h2 className="text-lg font-bold text-white">Live Now</h2>
                     {liveStreams.length > 0 && (
-                      <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-[10px] font-bold text-red-400 border border-red-500/20">
+                      <span className="badge-live">
                         {liveStreams.length} streams
                       </span>
                     )}
                   </div>
+                  {liveStreams.length > 0 && (
+                    <button className="section-action flex items-center gap-1">
+                      View all <ArrowRight size={10} />
+                    </button>
+                  )}
                 </div>
                 {liveStreams.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 px-4 text-center rounded-2xl bg-white/[0.02] border border-white/[0.04]">
@@ -161,19 +248,22 @@ export default function DiscoverPage() {
                 )}
               </motion.section>
 
-              {/* Recommended Creators - only from real backend data */}
+              {/* Recommended Creators */}
               {creators.length > 0 && (
                 <motion.section
-                  custom={2}
+                  custom={4}
                   variants={sectionVariants}
                   initial="hidden"
                   animate="visible"
                 >
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="section-header">
                     <div className="flex items-center gap-2">
                       <Sparkles size={16} className="text-[#ff007f]" />
                       <h2 className="text-lg font-bold text-white">Recommended Creators</h2>
                     </div>
+                    <button className="section-action flex items-center gap-1">
+                      View all <ArrowRight size={10} />
+                    </button>
                   </div>
                   <div className="flex overflow-x-auto scrollbar-hide gap-4 pb-2">
                     {creators.slice(0, 8).map((creator: any, i: number) => (
@@ -209,22 +299,7 @@ export default function DiscoverPage() {
                 </motion.section>
               )}
 
-              {/* Categories - only shown if real data from backend */}
-              {hasCategories && (
-                <motion.section
-                  custom={3}
-                  variants={sectionVariants}
-                  initial="hidden"
-                  animate="visible"
-                >
-                  <div className="flex items-center gap-2 mb-4">
-                    <Hash size={16} className="text-[#00d8ff]" />
-                    <h2 className="text-lg font-bold text-white">Explore Categories</h2>
-                  </div>
-                </motion.section>
-              )}
-
-              {/* Empty state when nothing at all exists */}
+              {/* Empty state */}
               {liveStreams.length === 0 && creators.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
                   <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#ff007f]/10 to-[#7a00cc]/10 border border-[#ff007f]/15 flex items-center justify-center mb-5">
@@ -236,7 +311,7 @@ export default function DiscoverPage() {
                   </p>
                   <button
                     onClick={fetchData}
-                    className="mt-6 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white text-sm font-bold"
+                    className="btn-primary mt-6 text-sm"
                   >
                     Refresh
                   </button>
@@ -244,7 +319,7 @@ export default function DiscoverPage() {
               )}
             </div>
 
-            {/* Right Sidebar - only rendered, shows empty states internally */}
+            {/* Right Sidebar */}
             <div className="hidden lg:block">
               <div className="sticky top-24">
                 <DiscoverSidebar />

@@ -1,255 +1,490 @@
 ﻿'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet } from '@/lib/apiClient';
-import { Sparkles, TrendingUp, Users, Eye, DollarSign, Radio, BarChart3, Settings, Loader2, Calendar, Activity, Zap, Crown, Star, ChevronRight, Clock, Gift, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatNumber } from '@/lib/utils';
-import Link from 'next/link';
+import {
+  BarChart3,
+  TrendingUp,
+  Users,
+  Eye,
+  Heart,
+  MessageCircle,
+  Share2,
+  DollarSign,
+  Gift,
+  Sparkles,
+  Loader2,
+  Calendar,
+  Clock,
+  FileText,
+  Video,
+  Image,
+  Film,
+  Radio,
+  Settings,
+  ChevronRight,
+  ArrowUp,
+  ArrowDown,
+  Target,
+  Zap,
+  Crown,
+  Award,
+  Star,
+} from 'lucide-react';
 
-const creatorLinks = [
-  { icon: Radio, label: 'Go Live', href: '/creator/live', color: 'from-pink-500 to-rose-600', desc: 'Start streaming now' },
-  { icon: BarChart3, label: 'Analytics', href: '/creator/analytics', color: 'from-purple-500 to-violet-600', desc: 'Track your growth' },
-  { icon: TrendingUp, label: 'Earnings', href: '/creator/earnings', color: 'from-emerald-500 to-teal-600', desc: 'Revenue & payouts' },
-  { icon: Users, label: 'Community', href: '/creator/community', color: 'from-cyan-500 to-blue-600', desc: 'Manage followers' },
-  { icon: Sparkles, label: 'Content', href: '/creator/content', color: 'from-amber-500 to-orange-600', desc: 'Your posts & streams' },
-  { icon: Settings, label: 'Settings', href: '/creator/monetization', color: 'from-indigo-500 to-purple-600', desc: 'Channel settings' },
+// Tab definitions
+const tabs = [
+  { id: 'overview', label: 'Overview', icon: BarChart3 },
+  { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+  { id: 'content', label: 'Content', icon: FileText },
+  { id: 'revenue', label: 'Revenue', icon: DollarSign },
+  { id: 'audience', label: 'Audience', icon: Users },
+  { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
-export default function CreatorDashboard() {
+// Metric card component
+function MetricCard({ icon: Icon, label, value, change, color }: {
+  icon: any;
+  label: string;
+  value: string;
+  change?: { value: string; positive: boolean };
+  color: string;
+}) {
+  return (
+    <div className="card-premium p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center', color)}>
+          <Icon size={16} className="text-white" />
+        </div>
+        {change && (
+          <span className={cn(
+            'flex items-center gap-0.5 text-[10px] font-medium',
+            change.positive ? 'text-emerald-400' : 'text-red-400'
+          )}>
+            {change.positive ? <ArrowUp size={10} /> : <ArrowDown size={10} />}
+            {change.value}
+          </span>
+        )}
+      </div>
+      <p className="text-2xl font-bold text-white">{value}</p>
+      <p className="text-[10px] text-white/40 mt-1">{label}</p>
+    </div>
+  );
+}
+
+export default function CreatorStudioPage() {
   const { token } = useAuth();
-  const [analytics, setAnalytics] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<any>(null);
+  const [content, setContent] = useState<any[]>([]);
 
-  const fetchAnalytics = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await apiGet<any>('/api/analytics/creator/summary', token);
-      setAnalytics(data);
+      const [statsData, contentData] = await Promise.all([
+        apiGet<any>('/api/creator/stats', token).catch(() => null),
+        apiGet<any>('/api/creator/content', token).catch(() => ({ posts: [] })),
+      ]);
+      setStats(statsData);
+      setContent(Array.isArray(contentData) ? contentData : contentData?.posts ?? contentData?.data ?? []);
     } catch (err: any) {
-      setError(err.message || 'Failed to load analytics');
+      setError(err.message || 'Failed to load creator studio');
     } finally {
       setLoading(false);
     }
   }, [token]);
 
-  useEffect(() => { fetchAnalytics(); }, [fetchAnalytics]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-6">
         <div className="skeleton h-8 w-48" />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => <div key={i} className="skeleton h-32 rounded-3xl" />)}
+        <div className="grid grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => <div key={i} className="skeleton h-32 rounded-2xl" />)}
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="skeleton h-28 rounded-2xl" />)}
-        </div>
+        <div className="skeleton h-64 rounded-3xl" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="max-w-5xl mx-auto flex flex-col items-center justify-center py-24">
+      <div className="flex flex-col items-center justify-center py-24">
         <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-4">
           <Loader2 size={24} className="text-red-400" />
         </div>
-        <h2 className="text-lg font-medium text-white/60 mb-2">Failed to load dashboard</h2>
+        <h2 className="text-lg font-medium text-white/60 mb-2">Failed to load creator studio</h2>
         <p className="text-sm text-white/30 mb-6">{error}</p>
-        <button onClick={fetchAnalytics} className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white text-sm font-bold">
-          Try Again
-        </button>
+        <button onClick={fetchData} className="btn-primary text-sm">Try Again</button>
       </div>
     );
   }
-
-  const stats = [
-    { icon: Eye, label: 'Total Views', value: analytics?.totalViews ?? 0, change: '+12.5%', color: 'from-pink-500/20 to-pink-500/5', iconColor: 'text-pink-400' },
-    { icon: Users, label: 'Followers', value: analytics?.totalFollowers ?? 0, change: '+5.2%', color: 'from-purple-500/20 to-purple-500/5', iconColor: 'text-purple-400' },
-    { icon: DollarSign, label: 'Earnings', value: `$${analytics?.totalEarnings ?? 0}`, change: '+18.7%', color: 'from-emerald-500/20 to-emerald-500/5', iconColor: 'text-emerald-400' },
-    { icon: Radio, label: 'Streams', value: analytics?.totalStreams ?? 0, change: '+8.3%', color: 'from-cyan-500/20 to-cyan-500/5', iconColor: 'text-cyan-400' },
-  ];
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="max-w-5xl mx-auto space-y-6 pb-24 lg:pb-10"
+      className="max-w-6xl mx-auto space-y-6"
     >
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-start justify-between"
+        className="flex items-center justify-between"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#ff007f] to-[#7c3aed] flex items-center justify-center shadow-lg shadow-[#ff007f]/20">
             <Sparkles size={18} className="text-white" />
           </div>
           <div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight">Creator Studio</h1>
-            <p className="text-sm text-white/40">Manage your content, track growth, and earn revenue</p>
+            <h1 className="text-2xl font-bold text-white">Creator Studio</h1>
+            <p className="text-sm text-white/40">Manage your content and grow your audience</p>
           </div>
         </div>
-        <Link
-          href="/creator/live"
-          className="hidden sm:flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white text-sm font-bold shadow-lg shadow-[#ff007f]/20 hover:shadow-[#ff007f]/30 transition-all"
-        >
-          <Radio size={14} />
-          Go Live
-        </Link>
+        <div className="flex items-center gap-2">
+          <span className="px-3 py-1.5 rounded-full bg-amber-500/10 text-[10px] font-bold text-amber-400 border border-amber-500/20">
+            <Crown size={10} className="inline mr-1" />
+            Creator Level {stats?.level || 1}
+          </span>
+        </div>
       </motion.div>
 
-      {/* Stats Grid */}
+      {/* Tab Bar */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="grid grid-cols-2 lg:grid-cols-4 gap-4"
       >
-        {stats.map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 + i * 0.05 }}
-            className={cn('relative overflow-hidden rounded-2xl bg-gradient-to-br border border-white/[0.06] p-4', stat.color)}
-          >
-            <stat.icon size={16} className={cn('mb-2', stat.iconColor)} />
-            <p className="text-2xl font-bold text-white tabular-nums">
-              {typeof stat.value === 'string' ? stat.value : stat.value.toLocaleString()}
-            </p>
-            <p className="text-xs text-white/40 mt-0.5">{stat.label}</p>
-            <span className="absolute top-3 right-3 px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-[8px] font-medium text-emerald-400">
-              {stat.change}
-            </span>
-          </motion.div>
-        ))}
-      </motion.div>
-
-      {/* Quick Actions */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-white">Quick Actions</h2>
-          <Link href="/creator/settings" className="text-xs text-white/30 hover:text-white transition-colors">Manage all</Link>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {creatorLinks.map((link, i) => (
-            <motion.div
-              key={link.href}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 + i * 0.03 }}
-            >
-              <Link
-                href={link.href}
-                className="flex flex-col items-center text-center gap-2 rounded-2xl bg-white/[0.02] border border-white/[0.06] p-4 hover:bg-white/[0.04] hover:border-white/[0.1] transition-all duration-200 group"
+        <div className="flex items-center gap-1 bg-white/[0.04] rounded-xl p-1 overflow-x-auto scrollbar-hide">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  'flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap',
+                  isActive
+                    ? 'bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white shadow-sm'
+                    : 'text-gray-500 hover:text-white'
+                )}
               >
-                <div className={cn('w-10 h-10 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-lg', link.color)}>
-                  <link.icon size={16} className="text-white" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-white">{link.label}</p>
-                  <p className="text-[8px] text-white/30 mt-0.5">{link.desc}</p>
-                </div>
-              </Link>
-            </motion.div>
-          ))}
+                <Icon size={12} />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </motion.div>
 
-      {/* Recent Activity */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25 }}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Activity size={16} className="text-white/40" />
-            <h2 className="text-lg font-bold text-white">Recent Activity</h2>
+      {/* Overview Tab */}
+      {activeTab === 'overview' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="space-y-6"
+        >
+          {/* Metric Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <MetricCard
+              icon={Eye}
+              label="Total Views"
+              value={(stats?.totalViews ?? 0).toLocaleString()}
+              change={{ value: '+12.5%', positive: true }}
+              color="bg-blue-500/10 border border-blue-500/20"
+            />
+            <MetricCard
+              icon={Users}
+              label="Total Followers"
+              value={(stats?.totalFollowers ?? 0).toLocaleString()}
+              change={{ value: '+5.2%', positive: true }}
+              color="bg-purple-500/10 border border-purple-500/20"
+            />
+            <MetricCard
+              icon={Heart}
+              label="Total Likes"
+              value={(stats?.totalLikes ?? 0).toLocaleString()}
+              change={{ value: '+8.1%', positive: true }}
+              color="bg-pink-500/10 border border-pink-500/20"
+            />
+            <MetricCard
+              icon={DollarSign}
+              label="Total Earnings"
+              value={`${(stats?.totalEarnings ?? 0).toLocaleString()} ⚡`}
+              change={{ value: '+15.3%', positive: true }}
+              color="bg-emerald-500/10 border border-emerald-500/20"
+            />
           </div>
-          <button className="text-xs text-white/30 hover:text-white transition-colors">View all</button>
-        </div>
 
-        {analytics?.recentActivity && analytics.recentActivity.length > 0 ? (
-          <div className="space-y-1">
-            {analytics.recentActivity.map((activity: any, i: number) => (
-              <motion.div
-                key={activity.id || i}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.03 }}
-                className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white/[0.03] transition-all cursor-pointer group"
-              >
-                <div className={cn(
-                  'w-10 h-10 rounded-xl flex items-center justify-center border',
-                  activity.type === 'stream' && 'bg-red-500/10 border-red-500/20',
-                  activity.type === 'post' && 'bg-[#ff007f]/10 border-[#ff007f]/20',
-                  activity.type === 'gift' && 'bg-amber-500/10 border-amber-500/20',
-                )}>
-                  {activity.type === 'stream' && <Play size={16} className="text-red-400" />}
-                  {activity.type === 'post' && <Sparkles size={16} className="text-[#ff007f]" />}
-                  {activity.type === 'gift' && <Gift size={16} className="text-amber-400" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white/70">{activity.message || activity.title}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <Clock size={10} className="text-white/20" />
-                    <span className="text-[10px] text-white/30">{activity.time || new Date(activity.createdAt).toLocaleDateString()}</span>
-                  </div>
-                </div>
-                <ChevronRight size={14} className="text-white/10 group-hover:text-white/30 transition-colors shrink-0" />
-              </motion.div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-12 px-4 text-center rounded-2xl bg-white/[0.02] border border-white/[0.04]">
-            <Activity size={32} className="text-white/10 mb-3" />
-            <h3 className="text-white/50 font-medium text-base mb-1">No recent activity</h3>
-            <p className="text-white/25 text-sm max-w-md">Your recent streams, posts, and interactions will appear here. Start creating to see activity!</p>
-          </div>
-        )}
-      </motion.div>
-
-      {/* Growth Tips */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="rounded-3xl bg-gradient-to-br from-[#ff007f]/5 via-[#7a00cc]/5 to-[#00d8ff]/5 border border-[#ff007f]/10 p-5"
-      >
-        <div className="flex items-center gap-2 mb-4">
-          <Zap size={16} className="text-[#ff007f]" />
-          <h2 className="text-lg font-bold text-white">Growth Tips</h2>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {[
-            { title: 'Stream consistently', desc: 'Stream at least 3 times per week to build your audience', emoji: '📅' },
-            { title: 'Engage with viewers', desc: 'Reply to comments and chat messages to build community', emoji: '💬' },
-            { title: 'Use tags & categories', desc: 'Properly tag your streams to reach the right audience', emoji: '🏷️' },
-            { title: 'Promote your streams', desc: 'Share your live streams on social media platforms', emoji: '📢' },
-          ].map((tip, i) => (
-            <div key={tip.title} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.04]">
-              <span className="text-lg">{tip.emoji}</span>
-              <div>
-                <p className="text-xs font-semibold text-white">{tip.title}</p>
-                <p className="text-[10px] text-white/40 mt-0.5">{tip.desc}</p>
+          {/* Performance Chart Placeholder */}
+          <div className="card-premium p-6">
+            <div className="section-header">
+              <h2 className="section-title">
+                <TrendingUp size={16} className="text-[#06f7ff]" />
+                Performance Overview
+              </h2>
+              <div className="flex items-center gap-2">
+                <button className="px-3 py-1 rounded-lg text-[10px] font-medium bg-white/[0.06] text-white/60 hover:text-white transition">7d</button>
+                <button className="px-3 py-1 rounded-lg text-[10px] font-medium bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white">30d</button>
+                <button className="px-3 py-1 rounded-lg text-[10px] font-medium bg-white/[0.06] text-white/60 hover:text-white transition">90d</button>
               </div>
             </div>
-          ))}
-        </div>
-      </motion.div>
+            <div className="h-48 rounded-2xl bg-white/[0.02] border border-white/[0.04] flex items-center justify-center">
+              <div className="flex flex-col items-center gap-2">
+                <BarChart3 size={24} className="text-white/10" />
+                <p className="text-xs text-white/20">Chart data will appear here</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Content */}
+          <div className="card-premium p-6">
+            <div className="section-header">
+              <h2 className="section-title">
+                <FileText size={16} className="text-[#ff007f]" />
+                Recent Content
+              </h2>
+              <button className="section-action flex items-center gap-1">
+                View all <ChevronRight size={10} />
+              </button>
+            </div>
+            {content.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <FileText size={24} className="text-white/10 mb-3" />
+                <p className="text-sm text-white/30">No content yet</p>
+                <p className="text-xs text-white/20 mt-1">Create your first post to get started</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {content.slice(0, 5).map((item: any, i: number) => (
+                  <div key={item.id || i} className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/[0.03] transition cursor-pointer">
+                    <div className="w-10 h-10 rounded-xl bg-white/[0.04] flex items-center justify-center">
+                      {item.type === 'video' ? <Video size={16} className="text-white/40" /> :
+                       item.type === 'image' ? <Image size={16} className="text-white/40" /> :
+                       <FileText size={16} className="text-white/40" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{item.title || 'Untitled'}</p>
+                      <p className="text-[10px] text-white/30">
+                        {item.views || 0} views · {item.likes || 0} likes
+                      </p>
+                    </div>
+                    <span className="text-[10px] text-white/20">
+                      {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Growth Recommendations */}
+          <div className="card-premium p-6 bg-gradient-to-br from-[#ff007f]/5 via-[#7c3aed]/5 to-[#06f7ff]/5">
+            <div className="flex items-center gap-2 mb-4">
+              <Target size={16} className="text-[#06f7ff]" />
+              <h2 className="text-base font-bold text-white">Growth Recommendations</h2>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03]">
+                <Zap size={14} className="text-amber-400 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-white">Post more Reels</p>
+                  <p className="text-[10px] text-white/40">Short-form video content gets 3x more engagement</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03]">
+                <Users size={14} className="text-[#06f7ff] mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-white">Go live this week</p>
+                  <p className="text-[10px] text-white/40">Live streams boost follower growth by 40%</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03]">
+                <Star size={14} className="text-[#ff007f] mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-white">Engage with comments</p>
+                  <p className="text-[10px] text-white/40">Replying to comments increases retention by 25%</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Analytics Tab */}
+      {activeTab === 'analytics' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="space-y-6"
+        >
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <MetricCard icon={Eye} label="Views (30d)" value={(stats?.views30d ?? 0).toLocaleString()} color="bg-blue-500/10 border border-blue-500/20" />
+            <MetricCard icon={Heart} label="Likes (30d)" value={(stats?.likes30d ?? 0).toLocaleString()} color="bg-pink-500/10 border border-pink-500/20" />
+            <MetricCard icon={MessageCircle} label="Comments" value={(stats?.totalComments ?? 0).toLocaleString()} color="bg-purple-500/10 border border-purple-500/20" />
+            <MetricCard icon={Share2} label="Shares" value={(stats?.totalShares ?? 0).toLocaleString()} color="bg-cyan-500/10 border border-cyan-500/20" />
+          </div>
+          <div className="card-premium p-6">
+            <h3 className="text-base font-bold text-white mb-4">Detailed Analytics</h3>
+            <div className="h-64 rounded-2xl bg-white/[0.02] border border-white/[0.04] flex items-center justify-center">
+              <BarChart3 size={32} className="text-white/10" />
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Content Tab */}
+      {activeTab === 'content' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="space-y-4"
+        >
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-bold text-white">Content Manager</h3>
+            <button className="btn-primary text-xs">
+              <Sparkles size={12} />
+              Create Content
+            </button>
+          </div>
+          {content.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center card-premium">
+              <FileText size={36} className="text-white/10 mb-4" />
+              <h3 className="text-white/50 font-medium text-base mb-1">No content yet</h3>
+              <p className="text-white/25 text-sm max-w-xs">Your posts, reels, and streams will appear here</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {content.map((item: any, i: number) => (
+                <div key={item.id || i} className="card-premium p-4">
+                  <div className="aspect-video rounded-xl bg-white/[0.04] mb-3 flex items-center justify-center">
+                    {item.type === 'video' ? <Video size={24} className="text-white/20" /> :
+                     item.type === 'image' ? <Image size={24} className="text-white/20" /> :
+                     <FileText size={24} className="text-white/20" />}
+                  </div>
+                  <p className="text-sm font-medium text-white truncate">{item.title || 'Untitled'}</p>
+                  <div className="flex items-center gap-3 mt-2 text-[10px] text-white/30">
+                    <span>{item.views || 0} views</span>
+                    <span>{item.likes || 0} likes</span>
+                    <span>{item.comments || 0} comments</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* Revenue Tab */}
+      {activeTab === 'revenue' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="space-y-6"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="card-premium p-4">
+              <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Total Earnings</p>
+              <p className="text-2xl font-bold text-white">{(stats?.totalEarnings ?? 0).toLocaleString()} ⚡</p>
+            </div>
+            <div className="card-premium p-4">
+              <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Gifts Received</p>
+              <p className="text-2xl font-bold text-white">{(stats?.giftsReceived ?? 0).toLocaleString()} ⚡</p>
+            </div>
+            <div className="card-premium p-4">
+              <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">This Month</p>
+              <p className="text-2xl font-bold text-white">{(stats?.monthlyEarnings ?? 0).toLocaleString()} ⚡</p>
+            </div>
+          </div>
+          <div className="card-premium p-6">
+            <h3 className="text-base font-bold text-white mb-4">Revenue History</h3>
+            <div className="h-48 rounded-2xl bg-white/[0.02] border border-white/[0.04] flex items-center justify-center">
+              <DollarSign size={32} className="text-white/10" />
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Audience Tab */}
+      {activeTab === 'audience' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="space-y-6"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="card-premium p-6">
+              <h3 className="text-sm font-bold text-white mb-4">Demographics</h3>
+              <div className="h-48 rounded-2xl bg-white/[0.02] border border-white/[0.04] flex items-center justify-center">
+                <Users size={32} className="text-white/10" />
+              </div>
+            </div>
+            <div className="card-premium p-6">
+              <h3 className="text-sm font-bold text-white mb-4">Active Hours</h3>
+              <div className="h-48 rounded-2xl bg-white/[0.02] border border-white/[0.04] flex items-center justify-center">
+                <Clock size={32} className="text-white/10" />
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Settings Tab */}
+      {activeTab === 'settings' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="space-y-4"
+        >
+          <div className="card-premium p-6">
+            <h3 className="text-base font-bold text-white mb-4">Creator Settings</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
+                <div>
+                  <p className="text-sm font-medium text-white">Creator Verification</p>
+                  <p className="text-[10px] text-white/40">Get verified to unlock premium features</p>
+                </div>
+                <button className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-[10px] font-bold text-white">
+                  Apply
+                </button>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
+                <div>
+                  <p className="text-sm font-medium text-white">Monetization</p>
+                  <p className="text-[10px] text-white/40">Enable tips and gifts for your content</p>
+                </div>
+                <div className="w-10 h-6 rounded-full bg-emerald-500/30 relative cursor-pointer">
+                  <div className="w-4 h-4 rounded-full bg-white absolute top-1 right-1" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
+                <div>
+                  <p className="text-sm font-medium text-white">Content Scheduling</p>
+                  <p className="text-[10px] text-white/40">Schedule posts for optimal times</p>
+                </div>
+                <button className="px-4 py-1.5 rounded-lg bg-white/[0.06] text-[10px] font-medium text-white/60 hover:text-white transition">
+                  Configure
+                </button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
     </motion.div>
   );
 }

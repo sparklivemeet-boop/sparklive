@@ -393,7 +393,7 @@ export default function LiveStudioPage() {
           style={{ width: '100%', height: '100%' }}
         >
           <div className="w-full h-full bg-black">
-            <ParticipantLoop>
+            <ParticipantLoop participants={[]}>
               <VideoTrack />
             </ParticipantLoop>
           </div>

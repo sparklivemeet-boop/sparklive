@@ -3,19 +3,22 @@
 import React from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Home, MessageCircle, Video, Bell, User } from 'lucide-react';
+import { Home, Compass, Film, Bell, User, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import SparkLiveLogo from '@/components/ui/SparkLiveLogo';
+
+interface BottomNavigationProps {
+  onCreateClick?: () => void;
+}
 
 const navItems = [
-  { href: '/discover', icon: Home, label: 'Home' },
-  { href: '/messages', icon: MessageCircle, label: 'Messages' },
-  { href: '/live', icon: Video, label: 'Live' },
+  { href: '/home', icon: Home, label: 'Home' },
+  { href: '/discover', icon: Compass, label: 'Discover' },
+  { href: '/reels', icon: Film, label: 'Reels' },
   { href: '/notification', icon: Bell, label: 'Alerts' },
   { href: '/profile', icon: User, label: 'Profile' },
 ];
 
-export default function BottomNavigation() {
+export default function BottomNavigation({ onCreateClick }: BottomNavigationProps) {
   const pathname = usePathname();
 
   return (
@@ -52,6 +55,15 @@ export default function BottomNavigation() {
           </Link>
         );
       })}
+
+      {/* Create FAB */}
+      <button
+        onClick={onCreateClick}
+        className="absolute -top-5 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-gradient-to-br from-[#ff007f] to-[#7a00cc] flex items-center justify-center shadow-lg shadow-[#ff007f]/30 hover:shadow-[#ff007f]/40 hover:scale-105 active:scale-95 transition-all duration-300"
+        aria-label="Create"
+      >
+        <Plus size={20} className="text-white" />
+      </button>
     </nav>
   );
 }

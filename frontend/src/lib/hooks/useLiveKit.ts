@@ -12,6 +12,7 @@ interface UseLiveKitOptions {
 
 interface UseLiveKitReturn {
   room: Room | null;
+  token: string | null;
   participants: RemoteParticipant[];
   localParticipant: LocalParticipant | null;
   connectionState: ConnectionState;
@@ -32,6 +33,7 @@ interface UseLiveKitReturn {
 
 export function useLiveKit(options: UseLiveKitOptions = {}): UseLiveKitReturn {
   const [room, setRoom] = useState<Room | null>(null);
+  const [liveKitToken, setLiveKitToken] = useState<string | null>(options.token || null);
   const [participants, setParticipants] = useState<RemoteParticipant[]>([]);
   const [localParticipant, setLocalParticipant] = useState<LocalParticipant | null>(null);
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
@@ -112,7 +114,7 @@ export function useLiveKit(options: UseLiveKitOptions = {}): UseLiveKitReturn {
         });
 
         newRoom.on(RoomEvent.ConnectionQualityChanged, (quality) => {
-          setConnectionQuality(quality);
+          setConnectionQuality(quality as unknown as number);
         });
 
         newRoom.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
@@ -233,6 +235,7 @@ export function useLiveKit(options: UseLiveKitOptions = {}): UseLiveKitReturn {
 
   return {
     room: roomRef.current,
+    token: liveKitToken,
     participants,
     localParticipant,
     connectionState,

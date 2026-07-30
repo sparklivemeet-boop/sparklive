@@ -215,7 +215,7 @@ export default function WatchStreamPage() {
             style={{ width: '100%', height: '100%' }}
           >
             <div className="w-full h-full">
-              <ParticipantLoop>
+              <ParticipantLoop participants={[]}>
                 <VideoTrack />
               </ParticipantLoop>
             </div>

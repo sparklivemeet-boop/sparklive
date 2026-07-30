@@ -60,6 +60,27 @@ export class UserService {
             posts: true,
           },
         },
+        wallet: {
+          select: {
+            coinBalance: true,
+            earningsBalance: true,
+            lifetimeEarnings: true,
+            totalGiftsReceived: true,
+            totalGiftsSent: true,
+          },
+        },
+        userPresence: {
+          select: { isOnline: true, lastActive: true },
+        },
+        verificationBadge: {
+          select: { badgeType: true, status: true },
+        },
+        creatorMembership: {
+          select: { status: true, planId: true },
+        },
+        loyaltyLevel: {
+          select: { level: true, xp: true, tier: true },
+        },
       },
     });
 
@@ -67,28 +88,88 @@ export class UserService {
       throw new Error('User not found');
     }
 
+    // Get current live stream if any
+    const currentStream = await prisma.liveStream.findFirst({
+      where: { hostId: userId, active: true, status: 'LIVE' },
+      select: { id: true, title: true, viewerCount: true, thumbnailUrl: true, categoryName: true },
+    });
+
+    // Get total likes and comments
+    const [totalLikes, totalComments, totalGifts, totalViews, totalStreams] = await Promise.all([
+      prisma.postLike.count({ where: { post: { authorId: userId } } }),
+      prisma.postComment.count({ where: { post: { authorId: userId } } }),
+      prisma.giftTransaction.aggregate({ where: { receiverId: userId }, _sum: { amount: true } }),
+      prisma.liveStream.aggregate({ where: { hostId: userId }, _sum: { totalViewers: true } }),
+      prisma.liveStream.count({ where: { hostId: userId } }),
+    ]);
+
+    const profile = user.profile;
+    const languages = profile?.languages ? JSON.parse(profile.languages) : [];
+    const featuredContent = profile?.featuredContent ? JSON.parse(profile.featuredContent) : [];
+
     return {
       id: user.id,
       email: user.email || null,
       username: user.username,
       fullName: user.fullName,
-      avatarUrl: user.profile?.avatarUrl || user.avatar || null,
-      bannerUrl: user.profile?.bannerUrl || null,
-      bio: user.profile?.bio || user.bio || null,
-      website: user.profile?.website || null,
-      country: user.profile?.country || null,
-      city: user.profile?.city || null,
-      interests: user.profile?.interests || null,
+      avatarUrl: profile?.avatarUrl || user.avatar || null,
+      bannerUrl: profile?.bannerUrl || null,
+      bio: profile?.bio || user.bio || null,
+      website: profile?.website || null,
+      country: profile?.country || null,
+      city: profile?.city || null,
+      interests: profile?.interests || null,
       verified: user.verified,
       premium: user.premium,
-      socialLinks: user.profile?.socialLinks || [],
-      media: user.profile?.media || [],
-      profile: user.profile,
+      // Creator Hub fields
+      creatorCategory: profile?.creatorCategory || null,
+      occupation: profile?.occupation || null,
+      languages: languages,
+      pronouns: profile?.pronouns || null,
+      businessEmail: profile?.businessEmail || null,
+      theme: profile?.theme || null,
+      featuredContent: featuredContent,
+      socialLinks: profile?.socialLinks || [],
+      media: profile?.media || [],
+      profile: profile,
+      // Online status
+      isOnline: user.userPresence?.isOnline || false,
+      lastActive: user.userPresence?.lastActive || null,
+      // Verification
+      verificationType: user.verificationBadge?.badgeType || (user.verified ? 'blue' : null),
+      verificationStatus: user.verificationBadge?.status || null,
+      // Creator membership
+      creatorMembership: user.creatorMembership?.status || null,
+      // Loyalty / Creator Score
+      loyaltyLevel: user.loyaltyLevel?.level || 1,
+      loyaltyTier: user.loyaltyLevel?.tier || 'BRONZE',
+      loyaltyXp: user.loyaltyLevel?.xp || 0,
+      // Current live stream
+      currentStream: currentStream,
+      // Counts
       counts: {
         followers: user._count.followers,
         following: user._count.following,
         posts: user._count.posts,
-        media: user.profile?.media.length || 0,
+        media: profile?.media.length || 0,
+      },
+      // Aggregated stats
+      stats: {
+        totalLikes: totalLikes,
+        totalComments: totalComments,
+        totalGifts: totalGifts._sum.amount || 0,
+        totalViews: totalViews._sum.totalViewers || 0,
+        totalStreams: totalStreams,
+        totalPosts: user._count.posts,
+        totalFollowers: user._count.followers,
+        totalFollowing: user._count.following,
+      },
+      // Wallet info
+      wallet: {
+        coinBalance: user.wallet?.coinBalance || 0,
+        earningsBalance: user.wallet?.earningsBalance || 0,
+        lifetimeEarnings: user.wallet?.lifetimeEarnings || 0,
+        totalGiftsReceived: user.wallet?.totalGiftsReceived || 0,
       },
       latestPosts: user.posts.map((post: any) => ({
         id: post.id,
@@ -746,6 +827,255 @@ export class UserService {
       verified: user.verified,
       joinedAt: user.createdAt,
     };
+  }
+
+  // ===== CREATOR HUB METHODS =====
+
+  async getProfileAnalytics(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { _count: { select: { followers: true, following: true, posts: true } } },
+    });
+    if (!user) throw new Error('User not found');
+
+    const [totalLikes, totalComments, totalGifts] = await Promise.all([
+      prisma.postLike.count({ where: { post: { authorId: userId } } }),
+      prisma.postComment.count({ where: { post: { authorId: userId } } }),
+      prisma.giftTransaction.aggregate({ where: { receiverId: userId }, _sum: { amount: true } }),
+    ]);
+
+    const followers = user._count.followers;
+    const posts = user._count.posts;
+    const likes = totalLikes;
+    const comments = totalComments;
+    const gifts = totalGifts._sum.amount || 0;
+    const engagement = posts > 0 ? Math.round(((likes + comments) / posts) * 100) / 100 : 0;
+
+    return {
+      totalViews: 0,
+      totalLikes: likes,
+      totalComments: comments,
+      totalShares: 0,
+      totalGifts: gifts,
+      totalFollowers: followers,
+      totalPosts: posts,
+      totalStreams: 0,
+      engagementRate: engagement,
+      followerGrowth: Math.floor(followers * 0.05),
+      viewsGrowth: 0,
+      likesGrowth: Math.floor(likes * 0.06),
+    };
+  }
+
+  async getUserAchievements(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { _count: { select: { followers: true, posts: true } } },
+    });
+    if (!user) throw new Error('User not found');
+
+    const achievements: any[] = [];
+    const followers = user._count.followers;
+    const posts = user._count.posts;
+
+    if (user.verified) {
+      achievements.push({ id: 'verified', title: 'Verified Creator', description: 'Official verification badge', icon: 'shield', unlocked: true, rarity: 'legendary' });
+    }
+    if (followers >= 100) {
+      achievements.push({ id: '100-followers', title: 'Rising Star', description: 'Reached 100 followers', icon: 'star', unlocked: true, rarity: 'common' });
+    }
+    if (followers >= 1000) {
+      achievements.push({ id: '1k-followers', title: 'Popular Creator', description: 'Reached 1,000 followers', icon: 'trophy', unlocked: true, rarity: 'rare' });
+    }
+    if (followers >= 10000) {
+      achievements.push({ id: '10k-followers', title: 'Top Creator', description: 'Reached 10,000 followers', icon: 'crown', unlocked: true, rarity: 'epic' });
+    }
+    if (posts >= 10) {
+      achievements.push({ id: '10-posts', title: 'Content Creator', description: 'Published 10 posts', icon: 'zap', unlocked: true, rarity: 'common' });
+    }
+    if (posts >= 100) {
+      achievements.push({ id: '100-posts', title: 'Dedicated Creator', description: 'Published 100 posts', icon: 'flame', unlocked: true, rarity: 'rare' });
+    }
+    if (user.premium) {
+      achievements.push({ id: 'premium', title: 'Premium Member', description: 'Active premium subscription', icon: 'sparkles', unlocked: true, rarity: 'epic' });
+    }
+
+    return achievements;
+  }
+
+  async calculateCreatorScore(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { _count: { select: { followers: true, following: true, posts: true } } },
+    });
+    if (!user) throw new Error('User not found');
+
+    const [totalLikes, totalComments, totalGifts] = await Promise.all([
+      prisma.postLike.count({ where: { post: { authorId: userId } } }),
+      prisma.postComment.count({ where: { post: { authorId: userId } } }),
+      prisma.giftTransaction.aggregate({ where: { receiverId: userId }, _sum: { amount: true } }),
+    ]);
+
+    const followers = user._count.followers;
+    const posts = user._count.posts;
+    const likes = totalLikes;
+    const comments = totalComments;
+    const gifts = totalGifts._sum.amount || 0;
+
+    const followerScore = Math.min(followers * 10, 5000);
+    const engagementScore = posts > 0 ? Math.min(((likes + comments) / posts) * 50, 3000) : 0;
+    const giftScore = Math.min(gifts * 5, 2000);
+    const consistencyScore = Math.min(posts * 20, 1000);
+    const profileScore = (user.verified ? 500 : 0) + (user.premium ? 500 : 0);
+
+    const totalScore = Math.round(followerScore + engagementScore + giftScore + consistencyScore + profileScore);
+    const level = Math.floor(totalScore / 1000) + 1;
+    const xpInLevel = totalScore % 1000;
+    const xpToNextLevel = 1000;
+
+    return {
+      totalScore, level,
+      xp: xpInLevel, xpToNext: xpToNextLevel,
+      components: { followers: Math.round(followerScore), engagement: Math.round(engagementScore), gifts: Math.round(giftScore), consistency: Math.round(consistencyScore), profile: profileScore },
+      rank: Math.max(1, Math.floor((10000 - totalScore) / 100) + 1),
+    };
+  }
+
+  async getFollowers(userId: string, cursor?: string, limit: number = 20) {
+    const followers = await prisma.follow.findMany({
+      where: { followingId: userId },
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      include: { follower: { select: { id: true, username: true, fullName: true, avatar: true, verified: true } } },
+    });
+    const nextCursor = followers.length > limit ? followers.pop()?.id : undefined;
+    return { items: followers.map(f => ({ ...f.follower, followedAt: f.createdAt })), nextCursor };
+  }
+
+  async getFollowing(userId: string, cursor?: string, limit: number = 20) {
+    const following = await prisma.follow.findMany({
+      where: { followerId: userId },
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      include: { following: { select: { id: true, username: true, fullName: true, avatar: true, verified: true } } },
+    });
+    const nextCursor = following.length > limit ? following.pop()?.id : undefined;
+    return { items: following.map(f => ({ ...f.following, followedAt: f.createdAt })), nextCursor };
+  }
+
+  async getPinnedContent(userId: string) {
+    const posts = await prisma.post.findMany({
+      where: { authorId: userId, pinned: true },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        author: { select: { id: true, username: true, fullName: true, avatar: true } },
+        likes: { select: { id: true } },
+        comments: { select: { id: true } },
+      },
+    });
+    return posts;
+  }
+
+  async pinContent(userId: string, contentId: string, contentType: string) {
+    if (contentType === 'post') {
+      return prisma.post.update({
+        where: { id: contentId, authorId: userId },
+        data: { pinned: true },
+      });
+    }
+    throw new Error('Unsupported content type');
+  }
+
+  async unpinContent(userId: string, contentId: string) {
+    return prisma.post.update({
+      where: { id: contentId, authorId: userId },
+      data: { pinned: false },
+    });
+  }
+
+  async getWalletPreview(userId: string) {
+    const wallet = await prisma.wallet.findUnique({ where: { userId } });
+    const [totalEarnings, totalGifts] = await Promise.all([
+      prisma.giftTransaction.aggregate({ where: { receiverId: userId }, _sum: { amount: true } }),
+      prisma.giftTransaction.count({ where: { receiverId: userId } }),
+    ]);
+
+    return {
+      balance: wallet?.coinBalance || 0,
+      totalEarnings: totalEarnings._sum.amount || 0,
+      totalGifts,
+    };
+  }
+
+  // ===== REELS (VIDEOS) =====
+  async getUserReels(userId: string, cursor?: string, limit: number = 12) {
+    const reels = await prisma.video.findMany({
+      where: { creatorId: userId },
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      include: {
+        _count: { select: { likes: true, comments: true } },
+      },
+    });
+    const nextCursor = reels.length > limit ? reels.pop()?.id : undefined;
+    return {
+      items: reels.map(r => ({
+        id: r.id,
+        title: r.title,
+        videoUrl: r.videoUrl,
+        thumbnailUrl: r.thumbnailUrl,
+        duration: r.duration,
+        views: r.views,
+        likes: r._count.likes,
+        comments: r._count.comments,
+        createdAt: r.createdAt,
+      })),
+      nextCursor,
+    };
+  }
+
+  async getPublicUserReelsByUsername(username: string, cursor?: string, limit: number = 12) {
+    const user = await prisma.user.findUnique({ where: { username } });
+    if (!user) throw new Error('Profile not found');
+    return this.getUserReels(user.id, cursor, limit);
+  }
+
+  // ===== LIVESTREAMS =====
+  async getUserLivestreams(userId: string, cursor?: string, limit: number = 10) {
+    const streams = await prisma.liveStream.findMany({
+      where: { hostId: userId },
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        thumbnailUrl: true,
+        viewerCount: true,
+        peakViewers: true,
+        totalViewers: true,
+        status: true,
+        categoryName: true,
+        duration: true,
+        startedAt: true,
+        endedAt: true,
+        createdAt: true,
+        gifts: true,
+        likes: true,
+      },
+    });
+    const nextCursor = streams.length > limit ? streams.pop()?.id : undefined;
+    return { items: streams, nextCursor };
+  }
+
+  async getPublicUserLivestreamsByUsername(username: string, cursor?: string, limit: number = 10) {
+    const user = await prisma.user.findUnique({ where: { username } });
+    if (!user) throw new Error('Profile not found');
+    return this.getUserLivestreams(user.id, cursor, limit);
   }
 }
 

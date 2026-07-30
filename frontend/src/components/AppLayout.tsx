@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import {
   MessageCircle,
   Video,
@@ -22,47 +21,83 @@ import {
   Users,
   Bookmark,
   Sparkles,
+  Plus,
+  Film,
+  Image,
+  FileText,
+  Radio,
+  Clock,
+  Calendar,
+  Zap,
+  ChevronRight,
+  Hash,
+  TrendingUp,
+  Gift,
+  Crown,
+  BarChart3,
+  HelpCircle,
+  Globe,
+  Moon,
+  Sun,
+  Menu,
 } from 'lucide-react';
 import SparkLiveLogo, { SparkLiveSidebarLogo, SparkLiveNavbarLogo } from '@/components/ui/SparkLiveLogo';
 import GlobalSearch from '@/components/search/GlobalSearch';
 import Avatar from '@/components/ui/Avatar';
+import CreateHub from '@/components/create/CreateHub';
 
 // Lazy load heavy components
 const BottomNavigation = lazy(() => import('./BottomNavigation'));
 
-// Navigation items
+// Navigation items — V2 Information Architecture
 const mainNavItems = [
-  { href: '/discover', icon: Compass, label: 'Explore' },
-  { href: '/messages', icon: MessageCircle, label: 'Messages' },
+  { href: '/home', icon: Home, label: 'Home' },
+  { href: '/discover', icon: Compass, label: 'Discover' },
+  { href: '/reels', icon: Film, label: 'Reels' },
   { href: '/live', icon: Video, label: 'Live' },
+  { href: '/messages', icon: MessageCircle, label: 'Messages' },
   { href: '/notification', icon: Bell, label: 'Notifications' },
   { href: '/profile', icon: User, label: 'Profile' },
   { href: '/wallet', icon: Wallet, label: 'Wallet' },
-  { href: '/settings', icon: Settings, label: 'Settings' },
 ];
 
-// Background effects
+const quickLinks = [
+  { href: '/bookmarks', icon: Bookmark, label: 'Bookmarks' },
+  { href: '/creator', icon: Sparkles, label: 'Creator Studio' },
+  { href: '/gift-store', icon: Gift, label: 'Gift Store' },
+  { href: '/rewards', icon: Crown, label: 'Rewards' },
+];
+
+const bottomLinks = [
+  { href: '/settings', icon: Settings, label: 'Settings' },
+  { href: '/help', icon: HelpCircle, label: 'Help Center' },
+];
+
+// Background effects — premium aurora
 const BackgroundEffects = memo(function BackgroundEffects() {
   return (
     <div className="pointer-events-none fixed inset-0 z-0">
-      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] rounded-full bg-[#7a00cc] opacity-[0.03] blur-[150px]" />
-      <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] rounded-full bg-[#ff007f] opacity-[0.02] blur-[180px]" />
-      <div className="absolute top-1/3 right-1/3 w-[400px] h-[400px] rounded-full bg-[#00d8ff] opacity-[0.02] blur-[120px]" />
+      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] rounded-full bg-[#7a00cc] opacity-[0.03] blur-[150px] animate-float-slow" />
+      <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] rounded-full bg-[#ff007f] opacity-[0.02] blur-[180px] animate-float-delayed" />
+      <div className="absolute top-1/3 right-1/3 w-[400px] h-[400px] rounded-full bg-[#00d8ff] opacity-[0.02] blur-[120px] animate-orb" />
+      <div className="absolute bottom-1/4 left-1/3 w-[350px] h-[350px] rounded-full bg-[#3b82f6] opacity-[0.015] blur-[100px] animate-float" />
     </div>
   );
 });
 
-// Mobile menu drawer
+// Mobile menu drawer — premium redesign
 const MobileMenu = memo(function MobileMenu({
   open,
   onClose,
   pathname,
   onLogout,
+  user,
 }: {
   open: boolean;
   onClose: () => void;
   pathname: string;
   onLogout: () => void;
+  user?: any;
 }) {
   return (
     <AnimatePresence>
@@ -76,16 +111,17 @@ const MobileMenu = memo(function MobileMenu({
             onClick={onClose}
           />
           <motion.aside
-            className="fixed left-0 top-0 bottom-0 z-50 w-[280px] bg-[#0e0e16] border-r border-white/[0.06] lg:hidden"
+            className="fixed left-0 top-0 bottom-0 z-50 w-[300px] bg-[#0e0e16]/95 backdrop-blur-2xl border-r border-white/[0.06] lg:hidden flex flex-col"
             initial={{ x: '-100%' }}
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
           >
-            <div className="flex items-center justify-between px-4 h-14 border-b border-white/[0.06]">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 h-14 border-b border-white/[0.06] shrink-0">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#ff007f] to-[#7a00cc] flex items-center justify-center">
-                  <SparkLiveLogo size={14} className="text-white" />
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#ff007f] to-[#7a00cc] flex items-center justify-center shadow-lg shadow-[#ff007f]/20">
+                  <SparkLiveLogo size={16} className="text-white" />
                 </div>
                 <span className="text-base font-bold text-white">SparkLive</span>
               </div>
@@ -98,33 +134,92 @@ const MobileMenu = memo(function MobileMenu({
               </button>
             </div>
 
-            <nav className="p-3 space-y-0.5">
-              {mainNavItems.map((item) => {
-                const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+            {/* User card */}
+            {user && (
+              <div className="px-4 py-3 border-b border-white/[0.04]">
+                <div className="flex items-center gap-3">
+                  <Avatar
+                    src={user.avatar}
+                    alt={user.username || 'User'}
+                    size="md"
+                    status="online"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-white truncate">{user.fullName || user.username || 'Guest'}</p>
+                    <p className="text-[10px] text-gray-500">@{user.username || 'user'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Navigation */}
+            <nav className="flex-1 overflow-y-auto scrollbar-hide px-3 py-2" role="navigation" aria-label="Main navigation">
+              <div className="space-y-0.5">
+                {mainNavItems.map((item) => {
+                  const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={onClose}
+                      className={cn(
+                        'flex items-center gap-3 rounded-xl px-3.5 py-3 transition-all',
+                        isActive
+                          ? 'bg-gradient-to-r from-[#ff007f]/10 to-[#7a00cc]/10 text-white border border-[#ff007f]/10'
+                          : 'text-gray-400 hover:bg-white/[0.04] hover:text-white'
+                      )}
+                    >
+                      <Icon size={17} />
+                      <span className="text-sm">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* Quick Links */}
+              <div className="mt-6 px-1">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-gray-600 font-semibold mb-3 px-2">
+                  Quick Links
+                </p>
+                <div className="space-y-0.5">
+                  {quickLinks.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={onClose}
+                        className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm text-gray-400 hover:bg-white/[0.04] hover:text-white transition-all"
+                      >
+                        <Icon size={16} />
+                        <span>{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </nav>
+
+            {/* Bottom actions */}
+            <div className="border-t border-white/[0.06] px-3 py-2 shrink-0">
+              {bottomLinks.map((item) => {
                 const Icon = item.icon;
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
                     onClick={onClose}
-                    className={cn(
-                      'flex items-center gap-3 rounded-xl px-3.5 py-3 transition-all',
-                      isActive
-                        ? 'bg-gradient-to-r from-[#ff007f]/10 to-[#7a00cc]/10 text-white'
-                        : 'text-gray-400 hover:bg-white/[0.04] hover:text-white'
-                    )}
+                    className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm text-gray-400 hover:bg-white/[0.04] hover:text-white transition-all"
                   >
-                    <Icon size={17} />
-                    <span className="text-sm">{item.label}</span>
+                    <Icon size={16} />
+                    <span>{item.label}</span>
                   </Link>
                 );
               })}
-            </nav>
-
-            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/[0.06]">
               <button
                 onClick={onLogout}
-                className="flex items-center gap-3 rounded-xl px-3.5 py-3 w-full text-sm text-red-400 hover:bg-white/[0.04] transition"
+                className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 w-full text-sm text-red-400 hover:bg-white/[0.04] transition mt-1"
                 aria-label="Logout"
               >
                 <LogOut size={16} />
@@ -138,12 +233,13 @@ const MobileMenu = memo(function MobileMenu({
   );
 });
 
-// Main AppLayout component
+// Main AppLayout component — V2 Redesign
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [createHubOpen, setCreateHubOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -152,6 +248,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const isAuthPage = ['/login', '/register', '/forgot-password', '/'].includes(pathname || '');
   const isChatPage = pathname?.startsWith('/messages');
+  const isReelsPage = pathname?.startsWith('/reels');
 
   const handleLogout = useCallback(() => {
     logout();
@@ -167,13 +264,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <BackgroundEffects />
 
       <div className="relative z-10 flex min-h-screen">
-        {/* Left Sidebar - Desktop Navigation */}
+        {/* Left Sidebar — Desktop Navigation (V2 Redesign) */}
         <aside className="hidden lg:flex h-screen w-[280px] flex-col border-r border-white/[0.06] bg-[#0e0e16]/80 backdrop-blur-2xl fixed left-0 top-0 z-40">
           {/* Logo */}
           <div className="px-4 pt-5 pb-3">
-              <Link href="/discover">
-                <SparkLiveSidebarLogo />
-              </Link>
+            <Link href="/home">
+              <SparkLiveSidebarLogo />
+            </Link>
           </div>
 
           {/* Search */}
@@ -220,14 +317,41 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 Quick Links
               </p>
               <div className="space-y-0.5">
-                <Link href="/bookmarks" className="nav-item">
-                  <Bookmark size={16} />
-                  <span>Bookmarks</span>
-                </Link>
-                <Link href="/creator" className="nav-item">
-                  <Sparkles size={16} />
-                  <span>Creator Studio</span>
-                </Link>
+                {quickLinks.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className="nav-item"
+                    >
+                      <Icon size={16} />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Bottom links */}
+            <div className="mt-6 px-1">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-gray-600 font-semibold mb-3 px-2">
+                Support
+              </p>
+              <div className="space-y-0.5">
+                {bottomLinks.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className="nav-item"
+                    >
+                      <Icon size={16} />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           </nav>
@@ -260,7 +384,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </aside>
 
         {/* Main Content Area */}
-        <main className={cn('flex-1 min-h-screen', 'lg:ml-[280px]')}>
+        <main className={cn(
+          'flex-1 min-h-screen',
+          'lg:ml-[280px]',
+          isReelsPage && 'lg:ml-0'
+        )}>
           {/* Mobile header */}
           <div className="lg:hidden sticky top-0 z-30 bg-[#0a0a0f]/80 backdrop-blur-2xl border-b border-white/[0.06]">
             <div className="flex items-center justify-between px-4 h-14">
@@ -269,22 +397,36 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 className="rounded-xl p-2 text-gray-400 hover:bg-white/[0.05] hover:text-white transition"
                 aria-label="Open menu"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+                <Menu size={20} />
               </button>
-              <Link href="/discover">
+              <Link href="/home">
                 <SparkLiveNavbarLogo />
               </Link>
-              <Avatar
-                src={user?.avatar}
-                alt={user?.username || 'User'}
-                size="sm"
-                status="online"
-                onClick={() => router.push('/profile')}
-              />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCreateHubOpen(true)}
+                  className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#ff007f] to-[#7a00cc] flex items-center justify-center shadow-lg shadow-[#ff007f]/20"
+                  aria-label="Create"
+                >
+                  <Plus size={16} className="text-white" />
+                </button>
+                <Avatar
+                  src={user?.avatar}
+                  alt={user?.username || 'User'}
+                  size="sm"
+                  status="online"
+                  onClick={() => router.push('/profile')}
+                />
+              </div>
             </div>
           </div>
 
-          <div className={cn('pb-24 lg:pb-10', !isChatPage && 'px-4 py-5 lg:px-6 xl:px-8', isChatPage && '')}>
+          <div className={cn(
+            'pb-24 lg:pb-10',
+            !isChatPage && !isReelsPage && 'px-4 py-5 lg:px-6 xl:px-8',
+            isChatPage && '',
+            isReelsPage && 'px-0 py-0'
+          )}>
             <motion.div
               key={isClient ? pathname : 'initial'}
               initial={{ opacity: 0, y: 10 }}
@@ -299,7 +441,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Bottom Navigation for Mobile/Tablet */}
         <div className="lg:hidden fixed inset-x-0 bottom-0 z-50">
           <Suspense fallback={<div className="h-16 bg-[#0e0e16]/90" />}>
-            <BottomNavigation />
+            <BottomNavigation onCreateClick={() => setCreateHubOpen(true)} />
           </Suspense>
         </div>
 
@@ -309,6 +451,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           onClose={() => setMobileMenuOpen(false)}
           pathname={pathname || ''}
           onLogout={handleLogout}
+          user={user}
+        />
+
+        {/* Create Hub Modal */}
+        <CreateHub
+          open={createHubOpen}
+          onClose={() => setCreateHubOpen(false)}
         />
       </div>
     </div>

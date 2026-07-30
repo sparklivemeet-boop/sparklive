@@ -18,6 +18,20 @@ import {
   getPublicProfileMedia,
   followUser,
   unfollowUser,
+  // New Creator Hub endpoints
+  getProfileAnalytics,
+  getProfileAchievements,
+  getCreatorScore,
+  getFollowers,
+  getFollowing,
+  getPinnedContent,
+  pinContent,
+  unpinContent,
+  getWalletPreview,
+  getProfileReels,
+  getPublicProfileReels,
+  getProfileLivestreams,
+  getPublicProfileLivestreams,
 } from '../controllers/profile.controller';
 import { authenticateJWT } from '../middleware/auth.middleware';
 
@@ -46,12 +60,15 @@ const upload = multer({
   },
 });
 
+// Public routes (no auth required)
 router.get('/public/:username', getPublicProfile);
 router.get('/public/:username/posts', getPublicProfilePosts);
 router.get('/public/:username/media', getPublicProfileMedia);
 
+// Auth required routes
 router.use(authenticateJWT);
 
+// Own profile
 router.get('/me', getProfile);
 router.get('/me/posts', getProfilePosts);
 router.get('/me/media', getProfileMedia);
@@ -61,8 +78,25 @@ router.put('/me', updateProfile);
 router.post('/me/avatar', upload.single('avatar'), uploadAvatar);
 router.post('/me/banner', upload.single('banner'), uploadBanner);
 router.post('/me/media', upload.single('media'), uploadProfileMedia);
+
+// Creator Hub endpoints
+router.get('/me/analytics', getProfileAnalytics);
+router.get('/me/achievements', getProfileAchievements);
+router.get('/me/creator-score', getCreatorScore);
+router.get('/me/followers', getFollowers);
+router.get('/me/following', getFollowing);
+router.get('/me/pinned', getPinnedContent);
+router.post('/me/pin', pinContent);
+router.delete('/me/pin', unpinContent);
+router.get('/me/wallet-preview', getWalletPreview);
+router.get('/me/reels', getProfileReels);
+router.get('/me/livestreams', getProfileLivestreams);
+
+// Follow system
 router.post('/:username/follow', followUser);
 router.delete('/:username/follow', unfollowUser);
+
+// Discover
 router.get('/discover', getDiscoverProfiles);
 
 export default router;

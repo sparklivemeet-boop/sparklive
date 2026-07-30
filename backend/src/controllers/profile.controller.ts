@@ -259,3 +259,214 @@ export const getDiscoverProfiles = async (req: AuthRequest, res: Response): Prom
     res.status(400).json({ error: message });
   }
 };
+
+// ===== NEW CREATOR HUB ENDPOINTS =====
+
+export const getProfileAnalytics = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const analytics = await userService.getProfileAnalytics(userId);
+    res.status(200).json(analytics);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getProfileAchievements = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const achievements = await userService.getUserAchievements(userId);
+    res.status(200).json(achievements);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getCreatorScore = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const score = await userService.calculateCreatorScore(userId);
+    res.status(200).json(score);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getFollowers = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    const limit = parseLimit(req.query.limit, 20);
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const followers = await userService.getFollowers(userId, cursor, limit);
+    res.status(200).json(followers);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getFollowing = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    const limit = parseLimit(req.query.limit, 20);
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const following = await userService.getFollowing(userId, cursor, limit);
+    res.status(200).json(following);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getPinnedContent = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const pinned = await userService.getPinnedContent(userId);
+    res.status(200).json(pinned);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const pinContent = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const { contentId, contentType } = req.body;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    if (!contentId || !contentType) {
+      res.status(400).json({ error: 'contentId and contentType are required' });
+      return;
+    }
+    const pinned = await userService.pinContent(userId, contentId, contentType);
+    res.status(200).json({ message: 'Content pinned successfully', pinned });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const unpinContent = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const { contentId } = req.body;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    if (!contentId) {
+      res.status(400).json({ error: 'contentId is required' });
+      return;
+    }
+    await userService.unpinContent(userId, contentId);
+    res.status(200).json({ message: 'Content unpinned successfully' });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getWalletPreview = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const wallet = await userService.getWalletPreview(userId);
+    res.status(200).json(wallet);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getProfileReels = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    const limit = parseLimit(req.query.limit, 12);
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const reels = await userService.getUserReels(userId, cursor, limit);
+    res.status(200).json(reels);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getPublicProfileReels = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const username = getParamString(req.params.username);
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    const limit = parseLimit(req.query.limit, 12);
+    const reels = await userService.getPublicUserReelsByUsername(username, cursor, limit);
+    res.status(200).json(reels);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(404).json({ error: message });
+  }
+};
+
+export const getProfileLivestreams = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    const limit = parseLimit(req.query.limit, 10);
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const streams = await userService.getUserLivestreams(userId, cursor, limit);
+    res.status(200).json(streams);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const getPublicProfileLivestreams = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const username = getParamString(req.params.username);
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    const limit = parseLimit(req.query.limit, 10);
+    const streams = await userService.getPublicUserLivestreamsByUsername(username, cursor, limit);
+    res.status(200).json(streams);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(404).json({ error: message });
+  }
+};

@@ -196,19 +196,29 @@ model TrustedDevice {
 }
 
 model Profile {
-  id          String         @id @default(cuid())
-  username    String         @unique
-  fullName    String?
-  bio         String?
-  avatarUrl   String?
-  bannerUrl   String?
-  website     String?
-  gender      String?
-  age         Int?
-  country     String?
-  city        String?
-  interests   String?
-  isOnline    Boolean        @default(false)
+  id              String         @id @default(cuid())
+  username        String         @unique
+  fullName        String?
+  bio             String?
+  avatarUrl       String?
+  bannerUrl       String?
+  website         String?
+  gender          String?
+  age             Int?
+  country         String?
+  city            String?
+  interests       String?
+  isOnline        Boolean        @default(false)
+  
+  // Creator Hub fields
+  creatorCategory String?        // music, gaming, creative, education, sports, tech, lifestyle, chatting
+  occupation      String?
+  languages       String?        // JSON array
+  pronouns        String?
+  businessEmail   String?
+  theme           String?        // custom profile theme
+  featuredContent String?        // JSON array of pinned content IDs with types
+  
   socialLinks SocialLink[]
   media       ProfileMedia[]
   userId      String         @unique
@@ -219,6 +229,7 @@ model Profile {
   @@index([isOnline])
   @@index([country, isOnline])
   @@index([gender, age])
+  @@index([creatorCategory])
 }
 
 model SocialLink {

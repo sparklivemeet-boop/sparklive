@@ -638,10 +638,10 @@ export default function GlobalSearch() {
                 </p>
                 <button
                   onClick={navigateToSearchPage}
-                  className="mt-3 flex items-center gap-1.5 text-[11px] text-[#00d8ff] hover:text-[#06f7ff] transition-colors"
+                  className="mt-3 flex items-center gap-1.5 text-[11px] text-[#00d8ff] hover:text-[#06f7ff] transition-colors font-medium"
                 >
-                  <Compass size={12} />
-                  Try advanced search
+                  <Search size={12} />
+                  Search all results
                 </button>
               </div>
             )}

@@ -93,8 +93,8 @@ export const unfollowUser = (username: string) => apiDelete<any>(`/api/profiles/
 // ==========================================
 export const fetchChats = () => apiGet<any>('/api/messages');
 export const getConversation = (id: string) => apiGet<any>(`/api/messages/${id}`);
-export const sendMessage = (conversationId: string, content: string, type?: string) => apiPost<any>(`/api/messages/${conversationId}`, { content, type });
-export const createConversation = (participantId: string) => apiPost<any>('/api/messages', { participantId });
+export const sendMessage = (conversationId: string, content: string, type?: string) => apiPost<any>('/api/messages/send', { conversationId, content, type });
+export const createConversation = (participantIds: string[]) => apiPost<any>('/api/messages/start', { participantIds });
 
 // ==========================================
 // NOTIFICATIONS

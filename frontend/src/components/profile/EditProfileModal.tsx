@@ -6,7 +6,7 @@ import {
   X, Camera, Upload, Save, Loader2, User, Globe, MapPin, Link2,
   Hash, Briefcase, Calendar, Heart, Shield, Palette, Languages,
   Eye, Bell, Check, AlertCircle, Image, Trash2, Undo2, RotateCw,
-  ZoomIn, ZoomOut, Sparkles, Zap, Crown, Star, Flame, Gem,
+  ZoomIn, ZoomOut, Sparkles, Zap, Crown, Star, Flame, Gem, Move,
   Music, Gamepad2, BookOpen, Trophy, Monitor, Smartphone,
   Palette as PaletteIcon, MessageCircle, Gift, Target, TrendingUp,
   Atom, Radio, Users, Quote, Smile, Frown, Meh,
@@ -180,8 +180,12 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
   const [avatarOffset, setAvatarOffset] = useState({ x: 0, y: 0 });
   const [bannerZoom, setBannerZoom] = useState(1);
   const [bannerOffset, setBannerOffset] = useState({ x: 0, y: 0 });
+  const [isDraggingAvatar, setIsDraggingAvatar] = useState(false);
+  const [isDraggingBanner, setIsDraggingBanner] = useState(false);
   const [showPlatformPicker, setShowPlatformPicker] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
+
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -330,6 +334,49 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
     setBannerZoom(1);
     setBannerOffset({ x: 0, y: 0 });
     if (bannerInputRef.current) bannerInputRef.current.value = '';
+  };
+
+  const resetAvatarCrop = () => {
+    setAvatarZoom(1);
+    setAvatarOffset({ x: 0, y: 0 });
+  };
+
+  const resetBannerCrop = () => {
+    setBannerZoom(1);
+    setBannerOffset({ x: 0, y: 0 });
+  };
+
+  const handleMediaDragStart = (type: 'avatar' | 'banner', e: React.PointerEvent<HTMLDivElement>) => {
+    if (type === 'avatar' && !avatarFile) return;
+    if (type === 'banner' && !bannerFile) return;
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+    if (type === 'avatar') setIsDraggingAvatar(true);
+    if (type === 'banner') setIsDraggingBanner(true);
+  };
+
+  const handleMediaDragMove = (type: 'avatar' | 'banner', e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragStartRef.current) return;
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+
+    if (type === 'avatar') {
+      setAvatarOffset(prev => ({
+        x: clamp(prev.x + dx * 0.12, -50, 50),
+        y: clamp(prev.y + dy * 0.12, -50, 50),
+      }));
+    } else {
+      setBannerOffset(prev => ({
+        x: clamp(prev.x + dx * 0.12, -50, 50),
+        y: clamp(prev.y + dy * 0.12, -50, 50),
+      }));
+    }
+  };
+
+  const handleMediaDragEnd = (type: 'avatar' | 'banner') => {
+    dragStartRef.current = null;
+    if (type === 'avatar') setIsDraggingAvatar(false);
+    if (type === 'banner') setIsDraggingBanner(false);
   };
 
   const handleSave = async () => {
@@ -791,14 +838,33 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
                               className="relative h-44 rounded-2xl overflow-hidden bg-gradient-to-r from-[#ff007f]/20 via-[#7a00cc]/20 to-[#00d8ff]/20 border border-white/[0.06] group"
                             >
                               {bannerPreview ? (
-                                <img
-                                  src={bannerPreview}
-                                  alt="Banner"
-                                  className="w-full h-full object-cover transition-transform duration-300"
-                                  style={{
-                                    transform: `scale(${bannerZoom}) translate(${bannerOffset.x * -0.08}%, ${bannerOffset.y * -0.08}%)`,
-                                  }}
-                                />
+                                <div
+                                  className={cn(
+                                    'w-full h-full cursor-grab active:cursor-grabbing select-none',
+                                    isDraggingBanner && 'cursor-grabbing'
+                                  )}
+                                  onPointerDown={(e) => handleMediaDragStart('banner', e)}
+                                  onPointerMove={(e) => handleMediaDragMove('banner', e)}
+                                  onPointerUp={() => handleMediaDragEnd('banner')}
+                                  onPointerLeave={() => handleMediaDragEnd('banner')}
+                                >
+                                  <div className="absolute inset-0 z-10 pointer-events-none">
+                                    <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-white/25" />
+                                    <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-white/20" />
+                                  </div>
+                                  <div className="absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/35 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.28em] text-white/80 backdrop-blur-md">
+                                    <Move size={10} />
+                                    Drag to reposition
+                                  </div>
+                                  <img
+                                    src={bannerPreview}
+                                    alt="Banner"
+                                    className="w-full h-full object-cover transition-transform duration-300"
+                                    style={{
+                                      transform: `scale(${bannerZoom}) translate(${bannerOffset.x * -0.08}%, ${bannerOffset.y * -0.08}%)`,
+                                    }}
+                                  />
+                                </div>
                               ) : (
                                 <div className="w-full h-full flex flex-col items-center justify-center gap-2">
                                   <Camera size={36} className="text-gray-700" />
@@ -829,7 +895,7 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
                               </div>
                             </motion.div>
                             {bannerPreview && (
-                              <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-2xl border border-white/[0.05] bg-white/[0.02] p-3">
+                              <div className="mt-3 grid grid-cols-1 sm:grid-cols-4 gap-3 rounded-2xl border border-white/[0.05] bg-white/[0.02] p-3">
                                 <label className="space-y-1.5">
                                   <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
                                     <ZoomIn size={10} /> Cover zoom
@@ -875,6 +941,15 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
                                     className="w-full accent-[#7a00cc] disabled:opacity-40"
                                   />
                                 </label>
+                                <div className="flex items-end">
+                                  <button
+                                    type="button"
+                                    onClick={resetBannerCrop}
+                                    className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-300 hover:text-white hover:bg-white/[0.06] transition-all"
+                                  >
+                                    Reset crop
+                                  </button>
+                                </div>
                               </div>
                             )}
                             <input ref={bannerInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleBannerSelect} />
@@ -886,7 +961,7 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
                             <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                               <Camera size={10} /> Profile Photo
                             </label>
-                            <div className="flex items-center gap-6">
+                            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
                               <motion.div
                                 className="relative group cursor-pointer"
                                 animate={{ rotate: avatarRotate }}
@@ -907,14 +982,33 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
                                 />
                                 <div className="w-28 h-28 rounded-full overflow-hidden border-2 border-white/[0.08] shadow-2xl relative bg-white/[0.03]">
                                   {avatarPreview ? (
-                                    <img
-                                      src={avatarPreview}
-                                      alt="Avatar"
-                                      className="w-full h-full object-cover transition-transform duration-300"
-                                      style={{
-                                        transform: `scale(${avatarZoom}) translate(${avatarOffset.x * -0.08}%, ${avatarOffset.y * -0.08}%)`,
-                                      }}
-                                    />
+                                    <div
+                                      className={cn(
+                                        'w-full h-full cursor-grab active:cursor-grabbing select-none',
+                                        isDraggingAvatar && 'cursor-grabbing'
+                                      )}
+                                      onPointerDown={(e) => handleMediaDragStart('avatar', e)}
+                                      onPointerMove={(e) => handleMediaDragMove('avatar', e)}
+                                      onPointerUp={() => handleMediaDragEnd('avatar')}
+                                      onPointerLeave={() => handleMediaDragEnd('avatar')}
+                                    >
+                                      <div className="absolute inset-0 z-10 pointer-events-none rounded-full">
+                                        <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-white/30" />
+                                        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-white/24" />
+                                      </div>
+                                      <div className="absolute left-2 top-2 z-20 flex items-center gap-1 rounded-full border border-white/10 bg-black/35 px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.26em] text-white/80 backdrop-blur-md">
+                                        <Move size={9} />
+                                        Move
+                                      </div>
+                                      <img
+                                        src={avatarPreview}
+                                        alt="Avatar"
+                                        className="w-full h-full object-cover transition-transform duration-300"
+                                        style={{
+                                          transform: `scale(${avatarZoom}) translate(${avatarOffset.x * -0.08}%, ${avatarOffset.y * -0.08}%)`,
+                                        }}
+                                      />
+                                    </div>
                                   ) : (
                                     <Avatar src={avatarPreview} alt="Avatar" size="2xl" className="w-full h-full" />
                                   )}
@@ -923,12 +1017,12 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
                                   </div>
                                 </div>
                               </motion.div>
-                              <div className="space-y-2.5">
+                              <div className="w-full sm:w-auto space-y-2.5">
                                 <motion.button
                                   whileHover={{ scale: 1.02 }}
                                   whileTap={{ scale: 0.98 }}
                                   onClick={() => avatarInputRef.current?.click()}
-                                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#ff007f]/10 to-[#7a00cc]/10 border border-[#ff007f]/20 text-xs text-pink-300 hover:text-pink-200 hover:bg-[#ff007f]/20 transition-all flex items-center gap-2"
+                                  className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-[#ff007f]/10 to-[#7a00cc]/10 border border-[#ff007f]/20 text-xs text-pink-300 hover:text-pink-200 hover:bg-[#ff007f]/20 transition-all flex items-center justify-center gap-2"
                                 >
                                   <Camera size={12} />
                                   Upload new photo
@@ -947,7 +1041,7 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
                               </div>
                             </div>
                             {avatarPreview && (
-                              <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-2xl border border-white/[0.05] bg-white/[0.02] p-3">
+                              <div className="mt-4 grid grid-cols-1 sm:grid-cols-4 gap-3 rounded-2xl border border-white/[0.05] bg-white/[0.02] p-3">
                                 <label className="space-y-1.5">
                                   <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
                                     <ZoomIn size={10} /> Avatar zoom
@@ -993,6 +1087,15 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }: Ed
                                     className="w-full accent-[#7a00cc] disabled:opacity-40"
                                   />
                                 </label>
+                                <div className="flex items-end">
+                                  <button
+                                    type="button"
+                                    onClick={resetAvatarCrop}
+                                    className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-300 hover:text-white hover:bg-white/[0.06] transition-all"
+                                  >
+                                    Reset crop
+                                  </button>
+                                </div>
                               </div>
                             )}
                             <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarSelect} />

@@ -4,16 +4,14 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet } from '@/lib/apiClient';
-import { Sparkles, TrendingUp, Radio, Users, Hash, ChevronRight, Loader2, Compass, Search, Flame, Music, Gamepad2, Palette, Globe, BookOpen, Camera, Star, ArrowRight } from 'lucide-react';
+import { Sparkles, Radio, Hash, Loader2, Compass, Flame, Music, Gamepad2, Palette, Globe, BookOpen, Camera, Star, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import DiscoverSearch from '@/components/discover/DiscoverSearch';
 import DiscoverHero from '@/components/discover/DiscoverHero';
 import DiscoverTabs from '@/components/discover/DiscoverTabs';
 import DiscoverSidebar from '@/components/discover/DiscoverSidebar';
 import LiveStreamsGrid from '@/components/discover/LiveStreamsGrid';
-import FloatingGoLiveButton from '@/components/profile/FloatingGoLiveButton';
-import PremiumGoLiveModal from '@/components/profile/PremiumGoLiveModal';
-import Avatar from '@/components/ui/Avatar';
+import CreatePostModal from '@/components/create/CreatePostModal';
 
 // Categories for exploration
 const categories = [
@@ -44,8 +42,7 @@ export default function DiscoverPage() {
   const [activeTab, setActiveTab] = useState('foryou');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [goLiveOpen, setGoLiveOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [postModalOpen, setPostModalOpen] = useState(false);
 
   // Data states - all from backend, no mock data
   const [liveStreams, setLiveStreams] = useState<any[]>([]);
@@ -71,8 +68,8 @@ export default function DiscoverPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
+  const handleSearch = () => {
+    return;
   };
 
   const sectionVariants = {
@@ -329,9 +326,19 @@ export default function DiscoverPage() {
         )}
       </motion.div>
 
-      {/* Floating Go Live */}
-      <FloatingGoLiveButton onClick={() => setGoLiveOpen(true)} />
-      <PremiumGoLiveModal open={goLiveOpen} onClose={() => setGoLiveOpen(false)} />
+      {/* Floating Post Action */}
+      <motion.button
+        onClick={() => setPostModalOpen(true)}
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-[#ff007f] via-[#7a00cc] to-[#3b82f6] px-4 py-3 text-sm font-semibold text-white shadow-2xl shadow-[#ff007f]/30 transition-all duration-300 hover:scale-105"
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.96 }}
+        aria-label="Create post"
+      >
+        <span className="text-lg leading-none">+</span>
+        <span>Post</span>
+      </motion.button>
+
+      <CreatePostModal open={postModalOpen} initialIntent="post" onClose={() => setPostModalOpen(false)} />
     </>
   );
 }

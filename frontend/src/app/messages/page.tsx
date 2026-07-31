@@ -1,35 +1,23 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 import { apiGet } from '@/lib/apiClient';
 import { cn } from '@/lib/utils';
 import {
-  MessageCircle,
-  Search,
-  Plus,
-  Phone,
-  Video,
-  MoreHorizontal,
-  Send,
-  Smile,
-  Paperclip,
-  Mic,
-  Image,
-  Check,
-  CheckCheck,
-  Loader2,
-  Users,
-  Hash,
-  Pin,
-  Bell,
-  BellOff,
-  ArrowLeft,
-  Trash2,
-  Edit3,
+  MessageCircle, Search, Plus, Phone, Video, MoreHorizontal,
+  Send, Smile, Paperclip, Mic, Image, Check, CheckCheck,
+  Loader2, Users, Hash, Pin, Bell, BellOff, ArrowLeft,
+  Trash2, Edit3, X, UserPlus, UserCheck, Group, Globe,
+  Lock, Camera, ChevronDown, ChevronUp, Pencil, Menu,
+  Twitter, Github, Instagram, Youtube, Linkedin, Sparkles,
+  User, LogOut, Settings, HelpCircle, Bookmark, Gift, Crown,
+  BarChart3, Wallet, Compass, Home, Radio, Film, Bell as BellIcon,
 } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
+import { useToast } from '@/components/ui/Toast';
 
 interface Conversation {
   id: string;
@@ -51,11 +39,7 @@ interface Conversation {
 interface Message {
   id: string;
   text: string;
-  sender: {
-    id: string;
-    username: string;
-    avatar?: string;
-  };
+  sender: { id: string; username: string; avatar?: string; };
   timestamp: string;
   read: boolean;
   isOwn: boolean;
@@ -63,6 +47,8 @@ interface Message {
 
 export default function MessagesPage() {
   const { token, user } = useAuth();
+  const router = useRouter();
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -71,15 +57,49 @@ export default function MessagesPage() {
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showMobileList, setShowMobileList] = useState(true);
+  const [showFab, setShowFab] = useState(false);
+  const [fabExpanded, setFabExpanded] = useState(false);
+  const fabRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Close FAB when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (fabRef.current && !fabRef.current.contains(e.target as Node)) {
+        setFabExpanded(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Auto-scroll to bottom of messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const fetchConversations = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await apiGet<any>('/api/messages/conversations', token).catch(() => ({ conversations: [] }));
+      const data = await apiGet<any>('/api/messages', token).catch(() => ({ conversations: [] }));
       const convList = Array.isArray(data) ? data : data?.conversations ?? data?.data ?? [];
-      setConversations(convList);
+      const normalizedConversations = convList.map((conv: any) => ({
+        id: conv.id,
+        type: conv.isGroup ? 'group' : 'private',
+        name: conv.name || conv.partner?.username || 'Conversation',
+        avatar: conv.partner?.avatar || conv.avatar,
+        lastMessage: conv.lastMessage ? {
+          text: conv.lastMessage.content ?? conv.lastMessage.text ?? '',
+          sender: conv.lastMessage.sender?.username ?? 'Unknown',
+          timestamp: conv.lastMessage.createdAt ?? conv.lastMessage.timestamp,
+          read: conv.lastMessage.read ?? false,
+        } : undefined,
+        unread: conv.unreadCount ?? conv.unread ?? 0,
+        online: Boolean(conv.partner?.isOnline ?? conv.online),
+      }));
+      setConversations(normalizedConversations);
     } catch (err: any) {
       setError(err.message || 'Failed to load conversations');
     } finally {
@@ -93,9 +113,7 @@ export default function MessagesPage() {
       const data = await apiGet<any>(`/api/messages/${conversationId}`, token).catch(() => ({ messages: [] }));
       const msgList = Array.isArray(data) ? data : data?.messages ?? data?.data ?? [];
       setMessages(msgList);
-    } catch (err: any) {
-      // Silently fail
-    }
+    } catch { /* silently fail */ }
   }, [token]);
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
@@ -104,6 +122,21 @@ export default function MessagesPage() {
     setActiveConversation(id);
     setShowMobileList(false);
     fetchMessages(id);
+  };
+
+  const handleNewGroup = () => {
+    setFabExpanded(false);
+    showToast?.({ type: 'info', title: 'New Group', message: 'Creating a new group...' });
+  };
+
+  const handleNewChannel = () => {
+    setFabExpanded(false);
+    showToast?.({ type: 'info', title: 'New Channel', message: 'Creating a new channel...' });
+  };
+
+  const handleNewChat = () => {
+    setFabExpanded(false);
+    showToast?.({ type: 'info', title: 'New Chat', message: 'Starting a new conversation...' });
   };
 
   const filteredConversations = conversations.filter(conv =>
@@ -133,9 +166,7 @@ export default function MessagesPage() {
         </div>
         <h3 className="text-white/50 font-medium text-lg mb-1">Failed to load messages</h3>
         <p className="text-white/30 text-sm mb-4">{error}</p>
-        <button onClick={fetchConversations} className="btn-primary text-sm">
-          Try Again
-        </button>
+        <button onClick={fetchConversations} className="btn-primary text-sm">Try Again</button>
       </div>
     );
   }
@@ -144,7 +175,7 @@ export default function MessagesPage() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="h-[calc(100vh-8rem)] lg:h-[calc(100vh-6rem)] flex rounded-3xl overflow-hidden border border-white/[0.06] bg-white/[0.02]"
+      className="h-[calc(100vh-8rem)] lg:h-[calc(100vh-6rem)] flex rounded-3xl overflow-hidden border border-white/[0.06] bg-white/[0.02] relative"
     >
       {/* Conversation List */}
       <div className={cn(
@@ -159,8 +190,11 @@ export default function MessagesPage() {
             </div>
             <h2 className="text-base font-bold text-white">Messages</h2>
           </div>
-          <button className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/[0.05] transition">
-            <Edit3 size={15} />
+          <button
+            onClick={() => setFabExpanded(!fabExpanded)}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/[0.05] transition"
+          >
+            <Pencil size={15} />
           </button>
         </div>
 
@@ -199,11 +233,7 @@ export default function MessagesPage() {
                 )}
               >
                 <div className="relative shrink-0">
-                  <Avatar
-                    src={conv.avatar}
-                    alt={conv.name}
-                    size="md"
-                  />
+                  <Avatar src={conv.avatar} alt={conv.name} size="md" />
                   {conv.online && (
                     <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#0a0a0f]" />
                   )}
@@ -259,11 +289,7 @@ export default function MessagesPage() {
                 >
                   <ArrowLeft size={18} />
                 </button>
-                <Avatar
-                  src={activeConv.avatar}
-                  alt={activeConv.name}
-                  size="sm"
-                />
+                <Avatar src={activeConv.avatar} alt={activeConv.name} size="sm" />
                 <div>
                   <p className="text-sm font-semibold text-white">{activeConv.name}</p>
                   <p className="text-[10px] text-emerald-400">
@@ -272,15 +298,9 @@ export default function MessagesPage() {
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <button className="btn-icon w-8 h-8">
-                  <Phone size={15} />
-                </button>
-                <button className="btn-icon w-8 h-8">
-                  <Video size={15} />
-                </button>
-                <button className="btn-icon w-8 h-8">
-                  <MoreHorizontal size={15} />
-                </button>
+                <button className="btn-icon w-8 h-8"><Phone size={15} /></button>
+                <button className="btn-icon w-8 h-8"><Video size={15} /></button>
+                <button className="btn-icon w-8 h-8"><MoreHorizontal size={15} /></button>
               </div>
             </div>
 
@@ -294,17 +314,8 @@ export default function MessagesPage() {
                 </div>
               ) : (
                 messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={cn(
-                      'flex',
-                      msg.isOwn ? 'justify-end' : 'justify-start'
-                    )}
-                  >
-                    <div className={cn(
-                      'max-w-[75%]',
-                      msg.isOwn ? 'order-1' : 'order-1'
-                    )}>
+                  <div key={msg.id} className={cn('flex', msg.isOwn ? 'justify-end' : 'justify-start')}>
+                    <div className={cn('max-w-[75%]', msg.isOwn ? 'order-1' : 'order-1')}>
                       {!msg.isOwn && (
                         <div className="flex items-center gap-2 mb-1 ml-1">
                           <span className="text-[10px] text-gray-500">{msg.sender.username}</span>
@@ -318,31 +329,25 @@ export default function MessagesPage() {
                       )}>
                         {msg.text}
                       </div>
-                      <div className={cn(
-                        'flex items-center gap-1 mt-0.5',
-                        msg.isOwn ? 'justify-end mr-1' : 'justify-start ml-1'
-                      )}>
+                      <div className={cn('flex items-center gap-1 mt-0.5', msg.isOwn ? 'justify-end mr-1' : 'justify-start ml-1')}>
                         <span className="text-[9px] text-gray-500">
                           {new Date(msg.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                         </span>
                         {msg.isOwn && (
-                          msg.read
-                            ? <CheckCheck size={10} className="text-[#06f7ff]" />
-                            : <Check size={10} className="text-gray-500" />
+                          msg.read ? <CheckCheck size={10} className="text-[#06f7ff]" /> : <Check size={10} className="text-gray-500" />
                         )}
                       </div>
                     </div>
                   </div>
                 ))
               )}
+              <div ref={messagesEndRef} />
             </div>
 
             {/* Message Input */}
             <div className="px-4 py-3 border-t border-white/[0.06]">
               <div className="flex items-center gap-2">
-                <button className="btn-icon w-9 h-9 shrink-0">
-                  <Paperclip size={16} />
-                </button>
+                <button className="btn-icon w-9 h-9 shrink-0"><Paperclip size={16} /></button>
                 <div className="flex-1 relative">
                   <input
                     type="text"
@@ -352,21 +357,14 @@ export default function MessagesPage() {
                     className="w-full rounded-xl border border-white/[0.06] bg-white/[0.04] py-2.5 px-4 text-sm text-white placeholder-gray-500 outline-none focus:border-[#ff007f]/30 transition-all"
                     onKeyDown={e => {
                       if (e.key === 'Enter' && messageInput.trim()) {
-                        // Send message
                         setMessageInput('');
                       }
                     }}
                   />
                 </div>
-                <button className="btn-icon w-9 h-9 shrink-0">
-                  <Smile size={16} />
-                </button>
+                <button className="btn-icon w-9 h-9 shrink-0"><Smile size={16} /></button>
                 <button
-                  onClick={() => {
-                    if (messageInput.trim()) {
-                      setMessageInput('');
-                    }
-                  }}
+                  onClick={() => { if (messageInput.trim()) setMessageInput(''); }}
                   className={cn(
                     'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all',
                     messageInput.trim()
@@ -390,6 +388,96 @@ export default function MessagesPage() {
             </p>
           </div>
         )}
+      </div>
+
+      {/* ===== TELEGRAM-STYLE FLOATING ACTION BUTTON ===== */}
+      <div ref={fabRef} className="fixed bottom-24 lg:bottom-8 right-6 z-50">
+        <AnimatePresence>
+          {fabExpanded && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 20 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="absolute bottom-20 right-0 w-72 rounded-2xl bg-[#0e0e16]/95 backdrop-blur-2xl border border-white/[0.08] shadow-2xl overflow-hidden"
+            >
+              {/* Search Bar */}
+              <div className="p-3 border-b border-white/[0.06]">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                  <input
+                    type="text"
+                    placeholder="Search users..."
+                    className="w-full rounded-xl border border-white/[0.06] bg-white/[0.04] py-2 pl-9 pr-4 text-xs text-white placeholder-gray-500 outline-none focus:border-[#ff007f]/30 transition-all"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {/* Menu Items */}
+              <div className="p-2 space-y-0.5">
+                <button
+                  onClick={handleNewChat}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/[0.04] transition-all text-left group"
+                >
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#00d8ff]/20 to-[#3b82f6]/20 border border-[#00d8ff]/20 flex items-center justify-center shrink-0">
+                    <UserPlus size={16} className="text-[#00d8ff]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white">New Chat</p>
+                    <p className="text-[10px] text-white/40">Start a private conversation</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={handleNewGroup}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/[0.04] transition-all text-left group"
+                >
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                    <Users size={16} className="text-emerald-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white">New Group</p>
+                    <p className="text-[10px] text-white/40">Create a group conversation</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={handleNewChannel}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/[0.04] transition-all text-left group"
+                >
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/20 flex items-center justify-center shrink-0">
+                    <Hash size={16} className="text-amber-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white">New Channel</p>
+                    <p className="text-[10px] text-white/40">Broadcast to your audience</p>
+                  </div>
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* FAB Button */}
+        <motion.button
+          onClick={() => setFabExpanded(!fabExpanded)}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          className={cn(
+            'w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300',
+            fabExpanded
+              ? 'bg-red-500 shadow-red-500/30 rotate-45'
+              : 'bg-gradient-to-r from-[#ff007f] to-[#7a00cc] shadow-[#ff007f]/30'
+          )}
+        >
+          <motion.div
+            animate={{ rotate: fabExpanded ? 45 : 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <Plus size={24} className="text-white" />
+          </motion.div>
+        </motion.button>
       </div>
     </motion.div>
   );

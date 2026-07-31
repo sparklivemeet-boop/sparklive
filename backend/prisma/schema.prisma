@@ -61,6 +61,7 @@ model User {
   posts             Post[]                   @relation("UserPosts")
   postLikes         PostLike[]
   postComments      PostComment[]
+  postSaves         PostSave[]
   videos            Video[]                  @relation("CreatorVideos")
   videoLikes        VideoLike[]
   videoComments     VideoComment[]
@@ -534,16 +535,31 @@ model Post {
   content   String
   mediaUrl  String?
   pinned    Boolean       @default(false)
-  likes     PostLike[]
-  comments  PostComment[]
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  likes       PostLike[]
+  comments    PostComment[]
+  saves       PostSave[]
+  shareCount  Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   @@index([authorId, createdAt])
   @@index([createdAt])
   @@index([pinned, authorId])
   @@index([authorId, pinned, createdAt])
   @@index([content])
+}
+
+model PostSave {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+  @@index([userId, createdAt])
+  @@index([postId, userId])
 }
 
 model PostLike {

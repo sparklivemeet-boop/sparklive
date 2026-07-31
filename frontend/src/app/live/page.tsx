@@ -28,6 +28,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
+import GoLiveModal from '@/components/create/GoLiveModal';
 import LiveCategoryFilters from '@/components/live/LiveCategoryFilters';
 import LiveFeaturedStream from '@/components/live/LiveFeaturedStream';
 import LiveSidebar from '@/components/live/LiveSidebar';
@@ -51,6 +52,7 @@ export default function LivePage() {
   const [error, setError] = useState<string | null>(null);
   const [streams, setStreams] = useState<any[]>([]);
   const [featuredStream, setFeaturedStream] = useState<any>(null);
+  const [goLiveOpen, setGoLiveOpen] = useState(false);
 
   const fetchStreams = useCallback(async () => {
     if (!token) return;
@@ -93,7 +95,7 @@ export default function LivePage() {
             <p className="text-sm text-white/40">Discover live streams</p>
           </div>
         </div>
-        <button className="btn-primary text-sm">
+        <button onClick={() => setGoLiveOpen(true)} className="btn-primary text-sm">
           <Radio size={14} />
           Go Live
         </button>
@@ -165,7 +167,7 @@ export default function LivePage() {
           <p className="text-sm text-white/30 max-w-sm mb-6">
             There are no live streams in this category right now. Be the first to go live!
           </p>
-          <button className="btn-primary text-sm">
+          <button onClick={() => setGoLiveOpen(true)} className="btn-primary text-sm">
             <Radio size={14} />
             Go Live Now
           </button>
@@ -240,6 +242,8 @@ export default function LivePage() {
           </div>
         </div>
       )}
+
+      <GoLiveModal open={goLiveOpen} onClose={() => setGoLiveOpen(false)} />
     </motion.div>
   );
 }

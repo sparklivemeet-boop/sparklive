@@ -563,6 +563,7 @@ export const CACHE_KEYS = {
   USER_FOLLOWERS: (userId: string) => `user:followers:${userId}`,
   USER_FOLLOWING: (userId: string) => `user:following:${userId}`,
   FEED: (userId: string, cursor?: string) => `feed:${userId}:${cursor || 'latest'}`,
+  HOME_FEED: (userId: string, cursor?: string) => `homefeed:${userId}:${cursor || 'latest'}`,
   TRENDING: 'trending',
   TRENDING_CREATORS: 'trending:creators',
   EXPLORE: 'explore',

@@ -10,6 +10,7 @@ import DiscoverSearch from '@/components/discover/DiscoverSearch';
 import DiscoverHero from '@/components/discover/DiscoverHero';
 import DiscoverTabs from '@/components/discover/DiscoverTabs';
 import DiscoverSidebar from '@/components/discover/DiscoverSidebar';
+import DiscoverStories from '@/components/discover/DiscoverStories';
 import LiveStreamsGrid from '@/components/discover/LiveStreamsGrid';
 import CreatePostModal from '@/components/create/CreatePostModal';
 
@@ -95,6 +96,24 @@ export default function DiscoverPage() {
           className="mb-6"
         >
           <DiscoverSearch onSearch={handleSearch} />
+        </motion.div>
+
+        {/* Stories Bar */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.02 }}
+          className="mb-6"
+        >
+          <div className="flex items-center gap-1 mb-3">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#ff007f]/20 to-[#7a00cc]/20 flex items-center justify-center">
+              <Camera size={11} className="text-[#ff007f]" />
+            </div>
+            <h2 className="text-xs font-semibold text-white/40 uppercase tracking-[0.15em]">Stories</h2>
+          </div>
+          <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-4">
+            <DiscoverStories />
+          </div>
         </motion.div>
 
         {/* Tabs */}

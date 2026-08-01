@@ -2,6 +2,7 @@ import { Router } from "express";
 import { authenticateJWT } from "../middleware/auth.middleware";
 import {
   getFeed,
+  getHomeFeed,
   getTrendingFeed,
   getExploreFeed,
   createPost,
@@ -25,6 +26,7 @@ const router = Router();
 router.use(authenticateJWT);
 
 router.get("/", getFeed);
+router.get("/home", getHomeFeed);
 router.get("/trending", getTrendingFeed);
 router.get("/explore", getExploreFeed);
 router.get("/saved", getSavedPosts);

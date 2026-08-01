@@ -248,6 +248,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isAuthPage = ['/login', '/register', '/forgot-password', '/'].includes(pathname || '');
   const isChatPage = pathname?.startsWith('/messages');
   const isReelsPage = pathname?.startsWith('/reels');
+  const isHomePage = pathname === '/home';
 
   const handleLogout = useCallback(() => {
     logout();
@@ -422,9 +423,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
           <div className={cn(
             'pb-24 lg:pb-10',
-            !isChatPage && !isReelsPage && 'px-4 py-5 lg:px-6 xl:px-8',
+            !isChatPage && !isReelsPage && !isHomePage && 'px-4 py-5 lg:px-6 xl:px-8',
             isChatPage && '',
-            isReelsPage && 'px-0 py-0'
+            isReelsPage && 'px-0 py-0',
+            isHomePage && 'px-0 py-0'
           )}>
             <motion.div
               key={isClient ? pathname : 'initial'}
@@ -458,6 +460,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           open={createHubOpen}
           onClose={() => setCreateHubOpen(false)}
         />
+
+        {/* Desktop Floating Create Button - TikTok style */}
+        {isHomePage && (
+          <motion.button
+            onClick={() => setCreateHubOpen(true)}
+            className="hidden lg:flex fixed bottom-8 right-8 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-[#ff007f] to-[#7a00cc] items-center justify-center shadow-2xl shadow-[#ff007f]/30 hover:shadow-[#ff007f]/40 hover:scale-110 active:scale-95 transition-all duration-300"
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3, type: 'spring', damping: 20, stiffness: 200 }}
+            aria-label="Create"
+          >
+            <Plus size={22} className="text-white" />
+          </motion.button>
+        )}
       </div>
     </div>
   );

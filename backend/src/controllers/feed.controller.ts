@@ -23,6 +23,21 @@ export const getFeed = async (req: AuthRequest, res: Response): Promise<void> =>
   }
 };
 
+export const getHomeFeed = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    const cursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
+    const limit = parseLimit(req.query.limit, 15);
+    const feed = await feedService.getHomeFeed(userId, cursor, limit);
+    res.status(200).json(feed);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Internal server error";
+    res.status(400).json({ error: message });
+  }
+};
+
 export const getTrendingFeed = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const cursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;

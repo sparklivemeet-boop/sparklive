@@ -189,8 +189,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     if (!token && !isPublicRoute) {
       router.push('/login');
-    } else if (token && pathname === '/login') {
-      router.push('/discover');
+    } else if (token && isPublicRoute && pathname !== '/') {
+      // After login/signup/password reset - always redirect to Home feed
+      router.push('/home');
     }
   }, [isLoading, token, pathname, router]);
 

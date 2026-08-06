@@ -7,6 +7,9 @@ type CreationFlow = 'post' | 'live' | null;
 interface ContentCreationState {
   activeFlow: CreationFlow;
   isSpeedDialOpen: boolean;
+  isCreateHubOpen: boolean;
+  openCreateHub: () => void;
+  closeCreateHub: () => void;
   openPostModal: () => void;
   openGoLiveModal: () => void;
   closeAll: () => void;
@@ -19,6 +22,16 @@ const ContentCreationContext = createContext<ContentCreationState | null>(null);
 export function ContentCreationProvider({ children }: { children: ReactNode }) {
   const [activeFlow, setActiveFlow] = useState<CreationFlow>(null);
   const [isSpeedDialOpen, setIsSpeedDialOpen] = useState(false);
+  const [isCreateHubOpen, setIsCreateHubOpen] = useState(false);
+
+  const openCreateHub = useCallback(() => {
+    setIsCreateHubOpen(true);
+    setIsSpeedDialOpen(false);
+  }, []);
+
+  const closeCreateHub = useCallback(() => {
+    setIsCreateHubOpen(false);
+  }, []);
 
   const openPostModal = useCallback(() => {
     setActiveFlow('post');
@@ -33,6 +46,7 @@ export function ContentCreationProvider({ children }: { children: ReactNode }) {
   const closeAll = useCallback(() => {
     setActiveFlow(null);
     setIsSpeedDialOpen(false);
+    setIsCreateHubOpen(false);
   }, []);
 
   const toggleSpeedDial = useCallback(() => {
@@ -48,6 +62,9 @@ export function ContentCreationProvider({ children }: { children: ReactNode }) {
       value={{
         activeFlow,
         isSpeedDialOpen,
+        isCreateHubOpen,
+        openCreateHub,
+        closeCreateHub,
         openPostModal,
         openGoLiveModal,
         closeAll,

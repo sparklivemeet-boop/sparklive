@@ -11,40 +11,25 @@ import {
   Video,
   Bell,
   User,
-  Search,
   Wallet,
   Settings,
   LogOut,
   X,
   Home,
   Compass,
-  Users,
   Bookmark,
   Sparkles,
   Plus,
-  Film,
-  Image,
-  FileText,
-  Radio,
-  Clock,
-  Calendar,
-  Zap,
-  ChevronRight,
-  Hash,
-  TrendingUp,
   Gift,
   Crown,
-  BarChart3,
   HelpCircle,
-  Globe,
-  Moon,
-  Sun,
   Menu,
 } from 'lucide-react';
 import SparkLiveLogo, { SparkLiveSidebarLogo, SparkLiveNavbarLogo } from '@/components/ui/SparkLiveLogo';
 import GlobalSearch from '@/components/search/GlobalSearch';
 import Avatar from '@/components/ui/Avatar';
 import CreateHub from '@/components/create/CreateHub';
+import { useContentCreation } from '@/components/create/ContentCreationContext';
 
 // Lazy load heavy components
 const BottomNavigation = lazy(() => import('./BottomNavigation'));
@@ -235,10 +220,10 @@ const MobileMenu = memo(function MobileMenu({
 // Main AppLayout component — V2 Redesign
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { isCreateHubOpen, openCreateHub, closeCreateHub } = useContentCreation();
   const router = useRouter();
   const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [createHubOpen, setCreateHubOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -404,7 +389,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </Link>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setCreateHubOpen(true)}
+                  onClick={openCreateHub}
                   className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#ff007f] to-[#7a00cc] flex items-center justify-center shadow-lg shadow-[#ff007f]/20"
                   aria-label="Create"
                 >
@@ -442,7 +427,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Bottom Navigation for Mobile/Tablet */}
         <div className="lg:hidden fixed inset-x-0 bottom-0 z-50">
           <Suspense fallback={<div className="h-16 bg-[#0e0e16]/90" />}>
-            <BottomNavigation onCreateClick={() => setCreateHubOpen(true)} />
+            <BottomNavigation onCreateClick={openCreateHub} />
           </Suspense>
         </div>
 
@@ -457,14 +442,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Create Hub Modal */}
         <CreateHub
-          open={createHubOpen}
-          onClose={() => setCreateHubOpen(false)}
+          open={isCreateHubOpen}
+          onClose={closeCreateHub}
         />
 
         {/* Desktop Floating Create Button - TikTok style */}
         {isHomePage && (
           <motion.button
-            onClick={() => setCreateHubOpen(true)}
+            onClick={openCreateHub}
             className="hidden lg:flex fixed bottom-8 right-8 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-[#ff007f] to-[#7a00cc] items-center justify-center shadow-2xl shadow-[#ff007f]/30 hover:shadow-[#ff007f]/40 hover:scale-110 active:scale-95 transition-all duration-300"
             initial={{ opacity: 0, scale: 0.5 }}
             animate={{ opacity: 1, scale: 1 }}

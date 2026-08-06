@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -9,9 +9,11 @@ import { cn } from '@/lib/utils';
 import {
   Flame, Radio, Users, Sparkles, Heart, MessageCircle, Share2,
   Bookmark, Gift, Plus, Loader2, Music, Volume2, VolumeX, Play,
-  Pause, Eye, Crown, RefreshCw,
+  Pause, Eye, Crown, RefreshCw, WifiOff,
 } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
+import GlobalSearch from '@/components/search/GlobalSearch';
+import { useContentCreation } from '@/components/create/ContentCreationContext';
 
 // Tab definitions
 const tabs = [
@@ -19,6 +21,7 @@ const tabs = [
   { id: 'following', label: 'Following', icon: Users },
   { id: 'live', label: 'Live', icon: Radio },
   { id: 'trending', label: 'Trending', icon: Flame },
+  { id: 'latest', label: 'Latest', icon: RefreshCw },
 ];
 
 // Feed item types
@@ -81,9 +84,10 @@ const formatTime = (dateStr: string) => {
 // Skeleton loader for the initial feed
 function FeedSkeleton() {
   return (
-    <div className="w-full max-w-[1000px] mx-auto space-y-6">
+    <div className="w-full max-w-[760px] mx-auto space-y-4 px-3 sm:px-4">
       {[1, 2].map((i) => (
-        <div key={i} className="relative rounded-3xl overflow-hidden bg-white/[0.02] border border-white/[0.06]" style={{ aspectRatio: '9/16', maxHeight: '80vh' }}>
+        <div key={i} className="relative min-h-[620px] h-[calc(100dvh-150px)] rounded-[28px] overflow-hidden bg-white/[0.025] border border-white/[0.06]">
+          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-white/[0.04] via-transparent to-[#7a00cc]/[0.06]" />
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-12 h-12 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center animate-pulse">
               <Loader2 size={20} className="text-white/20 animate-spin" />
@@ -91,22 +95,6 @@ function FeedSkeleton() {
           </div>
         </div>
       ))}
-    </div>
-  );
-}
-
-// Feed error state
-function FeedError({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div className="w-full max-w-[1000px] mx-auto flex flex-col items-center justify-center py-20">
-      <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-4">
-        <Loader2 size={24} className="text-red-400" />
-      </div>
-      <h3 className="text-white/50 font-medium text-lg mb-1">Failed to load feed</h3>
-      <p className="text-white/30 text-sm mb-4">{message}</p>
-      <button onClick={onRetry} className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white text-sm font-bold hover:shadow-lg hover:shadow-[#ff007f]/20 transition-all">
-        Try Again
-      </button>
     </div>
   );
 }
@@ -122,12 +110,12 @@ function RightActions({
   onFollow,
 }: {
   item: FeedItem;
-  onLike: (item: FeedItem) => void;
-  onComment: (item: FeedItem) => void;
-  onShare: (item: FeedItem) => void;
-  onGift: (item: FeedItem) => void;
-  onSave: (item: FeedItem) => void;
-  onFollow?: (item: FeedItem) => void;
+  onLike: (_item: FeedItem) => void;
+  onComment: (_item: FeedItem) => void;
+  onShare: (_item: FeedItem) => void;
+  onGift: (_item: FeedItem) => void;
+  onSave: (_item: FeedItem) => void;
+  onFollow?: (_item: FeedItem) => void;
 }) {
   const actionBtn = "flex flex-col items-center gap-1 group cursor-pointer";
   const actionIcon = (active?: boolean) => cn(
@@ -136,7 +124,7 @@ function RightActions({
   );
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-3 sm:gap-4" onClick={(event) => event.stopPropagation()}>
       <button className={actionBtn} onClick={() => onLike(item)} aria-label="Like">
         <div className={actionIcon(item.liked)}>
           <Heart size={18} className={item.liked ? 'text-[#ff007f] fill-[#ff007f]' : 'text-white'} />
@@ -207,8 +195,6 @@ function VideoPlayer({
   thumbnail,
   muted,
   autoPlay,
-  onToggleMute,
-  onTogglePlay,
   playing,
 }: {
   src?: string;
@@ -216,8 +202,6 @@ function VideoPlayer({
   muted: boolean;
   autoPlay: boolean;
   playing: boolean;
-  onToggleMute: () => void;
-  onTogglePlay: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -256,6 +240,10 @@ function VideoPlayer({
     // No video src - show a visual placeholder matching the item
     return (
       <div className="absolute inset-0 bg-gradient-to-br from-[#ff007f]/5 via-[#7c3aed]/5 to-[#06f7ff]/5">
+        {thumbnail && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={thumbnail} alt="" className="absolute inset-0 h-full w-full object-cover" loading={autoPlay ? 'eager' : 'lazy'} />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/20 via-transparent to-black/20" />
         <div className="absolute inset-0 flex items-center justify-center">
@@ -280,6 +268,7 @@ function VideoPlayer({
       muted={muted}
       autoPlay={autoPlay}
       playsInline
+      preload={autoPlay ? 'auto' : 'metadata'}
       className="w-full h-full object-cover"
     />
   );
@@ -302,52 +291,51 @@ function FeedCard({
   item: FeedItem;
   isActive: boolean;
   isFirst: boolean;
-  onLike: (item: FeedItem) => void;
-  onComment: (item: FeedItem) => void;
-  onShare: (item: FeedItem) => void;
-  onGift: (item: FeedItem) => void;
-  onSave: (item: FeedItem) => void;
-  onFollow?: (item: FeedItem) => void;
+  onLike: (_item: FeedItem) => void;
+  onComment: (_item: FeedItem) => void;
+  onShare: (_item: FeedItem) => void;
+  onGift: (_item: FeedItem) => void;
+  onSave: (_item: FeedItem) => void;
+  onFollow?: (_item: FeedItem) => void;
   onToggleMute: () => void;
   muted: boolean;
 }) {
   const router = useRouter();
   const [playing, setPlaying] = useState(isFirst);
-  const isVideo = item.type === 'reel' || item.type === 'video' || item.type === 'photo';
-  const hasMedia = !!item.media;
+  const isVideo = item.type === 'reel' || item.type === 'video';
+  const videoSource = item.playbackUrl || (isVideo ? item.media : undefined);
+  const imageSource = !isVideo ? (item.media || item.thumbnail) : undefined;
+
+  useEffect(() => {
+    if (isActive) setPlaying(true);
+  }, [isActive]);
 
   // Live stream badge
   const showLiveBadge = item.type === 'live';
 
   return (
-    <div
-      className="relative w-full rounded-3xl overflow-hidden bg-black border border-white/[0.06]"
-      style={{ aspectRatio: '9/16', maxHeight: '80vh', minHeight: '480px' }}
-      onClick={() => setPlaying(!playing)}
+    <motion.article
+      className="relative w-full min-h-[560px] h-[calc(100dvh-150px)] max-h-[860px] rounded-[24px] sm:rounded-[28px] overflow-hidden bg-black border border-white/[0.08] shadow-[0_28px_90px_rgba(0,0,0,0.45)] ring-1 ring-white/[0.02]"
+      onClick={() => isVideo && setPlaying(!playing)}
+      initial={{ opacity: 0, scale: 0.985 }}
+      whileInView={{ opacity: 1, scale: 1 }}
+      viewport={{ once: true, amount: 0.15 }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
     >
       {/* Media / Video Area */}
       <div className="absolute inset-0">
-        {isVideo && hasMedia ? (
+        {isVideo ? (
           <VideoPlayer
-            src={item.media}
+            src={videoSource}
             thumbnail={item.thumbnail}
             muted={muted}
             autoPlay={isActive}
-            playing={playing}
-            onToggleMute={onToggleMute}
-            onTogglePlay={() => setPlaying(!playing)}
+            playing={playing && isActive}
           />
-        ) : (
-          <VideoPlayer
-            src={undefined}
-            thumbnail={item.thumbnail}
-            muted={muted}
-            autoPlay={isActive}
-            playing={playing}
-            onToggleMute={onToggleMute}
-            onTogglePlay={() => setPlaying(!playing)}
-          />
-        )}
+        ) : imageSource ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={imageSource} alt="" className="h-full w-full object-cover" loading={isFirst ? 'eager' : 'lazy'} />
+        ) : <VideoPlayer src={undefined} thumbnail={item.thumbnail} muted playing={false} autoPlay={false} />}
 
         {/* Gradient overlays for readability */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-black/40 pointer-events-none" />
@@ -393,7 +381,7 @@ function FeedCard({
       </div>
 
       {/* Volume control */}
-      {isVideo && hasMedia && (
+      {isVideo && videoSource && (
         <button
           onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
           className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center hover:bg-black/60 transition"
@@ -504,12 +492,13 @@ function FeedCard({
           onFollow={onFollow}
         />
       </div>
-    </div>
+    </motion.article>
   );
 }
 
 export default function HomePage() {
   const { token } = useAuth();
+  const { openCreateHub } = useContentCreation();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('foryou');
   const [loading, setLoading] = useState(true);
@@ -520,8 +509,35 @@ export default function HomePage() {
   const [hasMore, setHasMore] = useState(true);
   const [muted, setMuted] = useState(true);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
+  const [online, setOnline] = useState(true);
   const feedContainerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  const displayFeed = useMemo(() => {
+    const next = [...feed];
+    if (activeTab === 'latest') {
+      next.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+    if (activeTab === 'trending') {
+      next.sort((a, b) => (b.likes + (b.views || 0)) - (a.likes + (a.views || 0)));
+    }
+    if (activeTab === 'live') {
+      next.sort((a, b) => (b.viewerCount || 0) - (a.viewerCount || 0));
+    }
+    return next;
+  }, [activeTab, feed]);
+
+  useEffect(() => {
+    setOnline(navigator.onLine);
+    const goOnline = () => setOnline(true);
+    const goOffline = () => setOnline(false);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
+  }, []);
 
   const fetchHomeFeed = useCallback(async (reset: boolean = false, nextCursor?: string) => {
     if (!token) return;
@@ -548,9 +564,12 @@ export default function HomePage() {
         setFeed(items);
         setCursor(data?.nextCursor);
         setHasMore(!!data?.nextCursor || items.length > 0);
-        // Set first item as active for autoplay
         if (items.length > 0) {
           setActiveItemId(items[0].id);
+          setError(null);
+        } else {
+          setActiveItemId(null);
+          setError('No recommendations are available right now.');
         }
       } else {
         // Append new items
@@ -563,7 +582,7 @@ export default function HomePage() {
         setHasMore(!!data?.nextCursor || items.length > 0);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to load feed');
+      setError(err.message || 'Recommended feed is temporarily unavailable');
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -613,24 +632,26 @@ export default function HomePage() {
     itemRefs.current.forEach((el) => observer.observe(el));
 
     return () => observer.disconnect();
-  }, [feed.length]);
+  }, [displayFeed]);
 
   // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === ' ') {
+      const target = e.target as HTMLElement;
+      if (target.matches('input, textarea, [contenteditable="true"]')) return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
       }
       if (e.key === 'ArrowDown') {
-        const currentIndex = feed.findIndex(i => i.id === activeItemId);
-        const next = feed[Math.min(currentIndex + 1, feed.length - 1)];
+        const currentIndex = displayFeed.findIndex(i => i.id === activeItemId);
+        const next = displayFeed[Math.min(currentIndex + 1, displayFeed.length - 1)];
         if (next && itemRefs.current.has(next.id)) {
           itemRefs.current.get(next.id)?.scrollIntoView({ behavior: 'smooth' });
           setActiveItemId(next.id);
         }
       } else if (e.key === 'ArrowUp') {
-        const currentIndex = feed.findIndex(i => i.id === activeItemId);
-        const prev = feed[Math.max(currentIndex - 1, 0)];
+        const currentIndex = displayFeed.findIndex(i => i.id === activeItemId);
+        const prev = displayFeed[Math.max(currentIndex - 1, 0)];
         if (prev && itemRefs.current.has(prev.id)) {
           itemRefs.current.get(prev.id)?.scrollIntoView({ behavior: 'smooth' });
           setActiveItemId(prev.id);
@@ -641,7 +662,7 @@ export default function HomePage() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [feed, activeItemId]);
+  }, [displayFeed, activeItemId]);
 
   // Action handlers
   const handleLike = useCallback(async (item: FeedItem) => {
@@ -763,15 +784,20 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="w-full">
+    <div className="relative w-full overflow-hidden bg-[#07070c]">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_70%_5%,rgba(122,0,204,0.12),transparent_36%),radial-gradient(circle_at_25%_70%,rgba(6,247,255,0.055),transparent_34%)]" />
       {/* Feed container with TikTok-style layout */}
       <div
         ref={feedContainerRef}
-        className="h-[calc(100vh-1rem)] lg:h-[calc(100vh-1rem)] overflow-y-auto scrollbar-hide relative"
+        className="relative h-[100dvh] overflow-y-auto overscroll-y-contain scroll-smooth scrollbar-hide"
       >
         {/* Sticky Tab Bar */}
-        <div className="sticky top-0 z-30 bg-[#0a0a0f]/80 backdrop-blur-2xl pt-4 pb-3">
-          <div className="flex items-center justify-center gap-1 max-w-[1000px] mx-auto">
+        <div className="sticky top-0 z-30 border-b border-white/[0.05] bg-[#07070c]/75 px-3 py-3 backdrop-blur-2xl">
+          <div className="mx-auto flex max-w-[1180px] items-center gap-3">
+            <div className="hidden min-w-[230px] max-w-[330px] flex-1 lg:block">
+              <GlobalSearch />
+            </div>
+            <div className="flex min-w-0 flex-1 items-center justify-start gap-1 overflow-x-auto rounded-2xl border border-white/[0.07] bg-white/[0.035] p-1 scrollbar-hide lg:justify-center">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
               const Icon = tab.icon;
@@ -780,9 +806,9 @@ export default function HomePage() {
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
                   className={cn(
-                    'flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 whitespace-nowrap relative',
+                    'relative flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-200 sm:px-4',
                     isActive
-                      ? 'text-white'
+                      ? 'bg-gradient-to-r from-[#ff007f]/20 to-[#7a00cc]/25 text-white shadow-[0_0_24px_rgba(255,0,127,0.12)]'
                       : 'text-gray-500 hover:text-white/80 hover:bg-white/[0.03]'
                   )}
                 >
@@ -791,47 +817,46 @@ export default function HomePage() {
                   {isActive && (
                     <motion.div
                       layoutId="home-tab-indicator"
-                      className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-gradient-to-r from-[#ff007f] to-[#7a00cc]"
+                      className="absolute bottom-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-gradient-to-r from-[#ff007f] to-[#06f7ff]"
                     />
                   )}
                 </button>
               );
             })}
+            </div>
+            <button onClick={openCreateHub} className="hidden h-10 shrink-0 items-center gap-2 rounded-2xl bg-gradient-to-r from-[#ff007f] via-[#9a30e8] to-[#3b82f6] px-4 text-xs font-bold text-white shadow-lg shadow-[#ff007f]/20 transition hover:-translate-y-0.5 lg:flex">
+              <Plus size={16} /> Create
+            </button>
           </div>
         </div>
+
+        {!online && (
+          <div className="sticky top-[65px] z-20 mx-auto flex w-fit items-center gap-2 rounded-b-xl border border-t-0 border-amber-400/20 bg-amber-500/15 px-4 py-1.5 text-[11px] font-medium text-amber-200 backdrop-blur-xl">
+            <WifiOff size={12} /> Offline
+          </div>
+        )}
 
         {/* Feed Content - no gap, content starts immediately */}
         {loading && feed.length === 0 ? (
           <div className="pt-4">
             <FeedSkeleton />
           </div>
-        ) : error && feed.length === 0 ? (
-          <div className="pt-4">
-            <FeedError message={error} onRetry={() => fetchHomeFeed(true)} />
-          </div>
-        ) : feed.length === 0 ? (
-          <div className="pt-4">
-            <div className="w-full max-w-[1000px] mx-auto flex flex-col items-center justify-center py-20 px-4 text-center">
-              <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-[#ff007f]/5 to-[#7c3aed]/5 border border-[#ff007f]/10 flex items-center justify-center mb-5">
-                <Sparkles size={40} className="text-[#ff007f]/20" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-2">Loading your feed...</h3>
-              <p className="text-sm text-white/30 max-w-sm mb-8 leading-relaxed">
-                Sit tight - trending content is on its way!
-              </p>
-              <button 
-                onClick={() => fetchHomeFeed(true)} 
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#ff007f] to-[#7a00cc] text-white text-sm font-bold hover:shadow-lg hover:shadow-[#ff007f]/20 transition-all"
-              >
-                <RefreshCw size={14} />
-                Refresh Feed
-              </button>
-            </div>
-          </div>
         ) : (
-          <div className="pt-4 space-y-6 pb-20">
-            <div className="w-full max-w-[1000px] mx-auto space-y-6">
-              {feed.map((item, index) => (
+          <div className="space-y-4 pb-24 pt-3 sm:pt-4">
+            {error && displayFeed.length > 0 && <div className="mx-auto flex max-w-[760px] items-center justify-between rounded-2xl border border-amber-400/15 bg-amber-400/[0.06] px-4 py-2 text-xs text-amber-100/70"><span>{error}</span><button onClick={() => fetchHomeFeed(true)} className="font-semibold text-white">Retry</button></div>}
+            <div className="mx-auto w-full max-w-[760px] space-y-4 px-2 sm:px-4">
+              {displayFeed.length === 0 && (
+                <div className="flex min-h-[420px] items-center justify-center rounded-[24px] border border-white/[0.07] bg-white/[0.025] px-6 text-center">
+                  <div className="max-w-xs">
+                    <RefreshCw size={22} className="mx-auto mb-4 text-white/35" />
+                    <p className="text-sm font-medium text-white/75">{error || 'The feed is unavailable right now.'}</p>
+                    <button onClick={() => fetchHomeFeed(true)} className="mt-5 rounded-xl bg-white/[0.08] px-5 py-2.5 text-xs font-semibold text-white transition hover:bg-white/[0.13]">
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              )}
+              {displayFeed.map((item, index) => (
                 <div
                   key={item.id}
                   ref={(el) => {
@@ -839,7 +864,7 @@ export default function HomePage() {
                     else itemRefs.current.delete(item.id);
                   }}
                   data-item-id={item.id}
-                  className="scroll-mt-20"
+                  className="scroll-mt-20 snap-start"
                 >
                   <FeedCard
                     item={item}
@@ -864,18 +889,16 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* End of feed */}
-              {!hasMore && !loadingMore && feed.length > 0 && (
-                <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-3">
-                    <Sparkles size={20} className="text-white/20" />
-                  </div>
-                  <p className="text-sm text-white/30">You've reached the end</p>
+              {/* Recommendations loop instead of an empty/end state */}
+              {!hasMore && !loadingMore && displayFeed.length > 0 && (
+                <div className="flex items-center justify-center gap-3 py-8 text-center">
+                  <Sparkles size={16} className="text-[#ff69b4]" />
+                  <p className="text-xs text-white/40">More moments are waiting</p>
                   <button 
                     onClick={() => fetchHomeFeed(true)} 
-                    className="mt-3 px-4 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-xs font-medium text-white/60 hover:bg-white/[0.1] hover:text-white transition-all"
+                    className="rounded-xl border border-white/[0.08] bg-white/[0.06] px-4 py-2 text-xs font-medium text-white/60 transition-all hover:bg-white/[0.1] hover:text-white"
                   >
-                    Refresh feed
+                    Refresh
                   </button>
                 </div>
               )}
@@ -883,6 +906,7 @@ export default function HomePage() {
           </div>
         )}
       </div>
+
     </div>
   );
 }
